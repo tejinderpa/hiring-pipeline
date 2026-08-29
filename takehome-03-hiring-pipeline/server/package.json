@@ -8,8 +8,10 @@
     "start": "node src/index.js"
   },
   "dependencies": {
+    "@prisma/client": "^7.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "prisma": "^7.10.0"
   }
 }

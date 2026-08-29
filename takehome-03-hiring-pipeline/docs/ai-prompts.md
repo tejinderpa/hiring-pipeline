@@ -89,3 +89,29 @@ After implementation:
 1. tell me how to run client and server separately
 2. tell me how to verify both start successfully
 3. stop there
+
+
+## Configuring prisma
+The frontend and Express backend are now running.
+
+Next I only want to configure Prisma with my PostgreSQL database.
+
+Requirements:
+
+- Install and initialise Prisma in server/
+- Configure Prisma to read DATABASE_URL from environment variables
+- PostgreSQL is the database provider
+- Do not create application models yet
+- Do not implement authentication
+- Do not create seed data
+- Do not modify frontend files
+- Do not modify README or docs
+
+Before editing anything, tell me exactly which files will change.
+
+After implementation, explain:
+1. what Prisma generated
+2. where the database URL comes from
+3. how I can verify Prisma can communicate with the database
+
+Stop after database connectivity is working.
