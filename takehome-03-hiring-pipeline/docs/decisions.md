@@ -16,11 +16,18 @@ below, not necessarily the last one; add a **Later reversed:** line to whichever
 * **Later reversed:** Prisma schema validation succeeded, but an actual database connectivity check failed with `P1001`. A separate network test showed that the Supabase direct database hostname was not resolving from my local environment. Instead of changing the Prisma setup or creating database models prematurely, I switched to Supabase's Session Pooler connection string and kept the application configuration unchanged apart from `DATABASE_URL`.
 
 
-## Decision 2
+## Decision 2 - skipped sign up page
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+Chose:
+Seed demo users and provide login only.
+
+Rejected:
+Public registration/signup.
+
+Why:
+Account creation is outside the stated assignment requirements. Adding signup
+would consume implementation and validation time without contributing to one
+of the ten required goals.
 
 ## Decision 3
 

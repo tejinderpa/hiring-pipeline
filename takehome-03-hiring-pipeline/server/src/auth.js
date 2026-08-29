@@ -6,6 +6,7 @@ import { prisma } from './prisma.js';
 
 const router = Router();
 const invalidCredentialsResponse = { error: 'Invalid email or password' };
+const authenticationRequiredResponse = { error: 'Authentication required' };
 
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
@@ -23,6 +24,46 @@ function buildSafeUser(user) {
     email: user.email,
     role: user.role,
   };
+}
+
+function getBearerToken(req) {
+  const authorization = req.get('authorization');
+
+  if (!authorization) {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    return null;
+  }
+
+  return token;
+}
+
+function authenticate(req, res, next) {
+  const token = getBearerToken(req);
+
+  if (!token) {
+    return res.status(401).json(authenticationRequiredResponse);
+  }
+
+  try {
+    const payload = jwt.verify(token, getJwtSecret());
+
+    if (!payload.sub) {
+      return res.status(401).json(authenticationRequiredResponse);
+    }
+
+    req.auth = {
+      userId: payload.sub,
+    };
+
+    return next();
+  } catch (error) {
+    return res.status(401).json(authenticationRequiredResponse);
+  }
 }
 
 async function login(req, res, next) {
@@ -61,6 +102,23 @@ async function login(req, res, next) {
   }
 }
 
+async function getCurrentUser(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.auth.userId },
+    });
+
+    if (!user) {
+      return res.status(401).json(authenticationRequiredResponse);
+    }
+
+    return res.json({ user: buildSafeUser(user) });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 router.post('/login', login);
+router.get('/me', authenticate, getCurrentUser);
 
 export default router;

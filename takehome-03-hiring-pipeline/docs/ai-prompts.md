@@ -142,3 +142,107 @@ After implementation, tell me:
 - why repeated runs don't duplicate users
 - how to execute it
 
+## Work on authentication
+Next I want to implement email/password login.
+
+Do not change any files yet.
+
+Design the simplest authentication flow suitable for this take-home application using:
+
+- Express
+- Prisma
+- bcrypt
+- JWT
+
+Required endpoints for now:
+
+POST /api/auth/login
+GET /api/auth/me
+
+I do not need:
+- signup
+- forgot password
+- email verification
+- OAuth
+- refresh tokens
+- logout API
+
+Explain the flow from login request to authenticated request.
+
+Also explain:
+- what should go inside the JWT
+- what should NOT go inside the JWT
+- what errors login should return
+- what GET /api/auth/me should do
+
+Keep the design appropriate for a roughly 12-hour assessment rather than a production identity platform.
+
+Do not implement anything.
+
+## Implementing Login
+Let's implement only POST /api/auth/login now.
+
+Requirements:
+
+Request:
+{
+  "email": "...",
+  "password": "..."
+}
+
+Behaviour:
+1. Find user by email using Prisma.
+2. Verify password using bcrypt.
+3. If credentials are invalid, return a clear authentication error without revealing whether the email or password was wrong.
+4. Generate a signed JWT containing only the minimum identity information needed.
+5. Return the token and a safe user object.
+6. Never return passwordHash.
+7. JWT secret must come from environment variables.
+
+Keep controller/business logic separated enough to remain readable, but don't create unnecessary architecture for one endpoint.
+
+Do not implement GET /api/auth/me yet.
+Do not implement role authorization yet.
+Do not touch frontend.
+
+Before editing, tell me the exact files that will change.
+
+After implementation:
+- explain the request flow
+- give me one successful request example
+- give me one invalid credential example
+- tell me how to test both
+
+
+## Implementing Middleware for authentication
+POST /api/auth/login is working.
+
+Now implement reusable authentication middleware and GET /api/auth/me.
+
+Requirements:
+
+Authentication middleware should:
+
+1. Read a Bearer token from the Authorization header.
+2. Verify the JWT using the environment JWT secret.
+3. Reject missing, malformed or invalid tokens.
+4. Make the authenticated user's identity available to downstream handlers.
+
+GET /api/auth/me should:
+
+1. require authentication
+2. return the currently authenticated user
+3. never expose passwordHash
+
+Keep error responses consistent with the login endpoint.
+
+Do not implement role authorization yet.
+Do not touch frontend yet.
+
+Before implementation, list the files you will modify.
+
+Afterward show me exactly how to verify:
+
+- valid token
+- no token
+- invalid token
