@@ -63,4 +63,29 @@ Inspect the existing repository structure and tell me only:
 - whether the provided assignment structure looks correct
 - what you recommend doing as the first technical step.
 
+## Starting Project Scaffolding
 
+Create:
+
+client/
+- React application using Vite
+- JavaScript, not TypeScript
+- Tailwind CSS
+- React Router
+
+server/
+- Node.js application
+- Express
+- dotenv
+- cors
+
+Do not add Prisma, authentication, database code, routes, business logic, or frontend pages yet.
+
+Keep both applications minimal.
+
+Before making changes, show me the files you intend to create or modify.
+
+After implementation:
+1. tell me how to run client and server separately
+2. tell me how to verify both start successfully
+3. stop there
