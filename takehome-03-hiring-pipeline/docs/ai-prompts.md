@@ -115,3 +115,30 @@ After implementation, explain:
 3. how I can verify Prisma can communicate with the database
 
 Stop after database connectivity is working.
+
+## Add demo users
+The User table exists.
+
+I want a small development seed script containing exactly two demo accounts:
+
+1. recruiter role
+2. interviewer role
+
+Passwords must be hashed with bcrypt before storage.
+
+Requirements:
+
+- use understandable demo names/emails
+- no plaintext password should be stored in the database
+- seed should be safe to run more than once without creating duplicate users
+- do not add login functionality yet
+- do not touch frontend
+- do not create any other data
+
+Before editing, tell me which files you will change.
+
+After implementation, tell me:
+- how the seed works
+- why repeated runs don't duplicate users
+- how to execute it
+
