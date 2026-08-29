@@ -1,22 +1,44 @@
 # Decisions
 
-Log the decisions that actually shaped this codebase — the ones where a real alternative existed and
+Log the decisions that actually shaped this codebase - the ones where a real alternative existed and
 you picked one. At least five entries. For each: what you chose, what you rejected, and why. At least
-one entry must be a decision you later reversed — say what changed your mind. It can be any entry
+one entry must be a decision you later reversed - say what changed your mind. It can be any entry
 below, not necessarily the last one; add a **Later reversed:** line to whichever one it is.
 
-## Decision 1 — Supabase database connection strategy
+## Decision 1 - Choosing PostgreSQL over MongoDB
 
-* **Chose:** Initially used Supabase's direct PostgreSQL connection with Prisma.
+Chose:
+PostgreSQL with Prisma.
 
-* **Rejected:** Using the Supabase connection pooler from the beginning.
+Rejected:
+MongoDB/Mongoose.
 
-* **Why:** The direct connection was the simplest option and seemed appropriate for local development, so I tried it first rather than adding another connection layer unnecessarily.
+Why:
+The domain has several relational structures ahead - applications belong to jobs,
+interviewer assignments will be many-to-many, and application history will reference
+users and applications. I am also comfortable enough with Prisma that this does not
+introduce significant learning overhead.
 
-* **Later reversed:** Prisma schema validation succeeded, but an actual database connectivity check failed with `P1001`. A separate network test showed that the Supabase direct database hostname was not resolving from my local environment. Instead of changing the Prisma setup or creating database models prematurely, I switched to Supabase's Session Pooler connection string and kept the application configuration unchanged apart from `DATABASE_URL`.
+## Decision 2 - Supabase database connection strategy
 
+Chose:
+Initially used Supabase's direct PostgreSQL connection with Prisma.
 
-## Decision 2 - skipped sign up page
+Rejected:
+Using the Supabase connection pooler from the beginning.
+
+Why:
+The direct connection was the simplest option and seemed appropriate for local
+development, so I tried it first rather than adding another connection layer unnecessarily.
+
+Later reversed:
+Prisma schema validation succeeded, but an actual database connectivity check failed
+with `P1001`. A separate network test showed that the Supabase direct database hostname
+was not resolving from my local environment. Instead of changing the Prisma setup or
+creating database models prematurely, I switched to Supabase's Session Pooler connection
+string and kept the application configuration unchanged apart from `DATABASE_URL`.
+
+## Decision 3 - Seed demo users instead of signup
 
 Chose:
 Seed demo users and provide login only.
@@ -25,24 +47,33 @@ Rejected:
 Public registration/signup.
 
 Why:
-Account creation is outside the stated assignment requirements. Adding signup
-would consume implementation and validation time without contributing to one
-of the ten required goals.
+Account creation is outside the stated assignment requirements. Adding signup would
+consume implementation and validation time without contributing to the core hiring
+pipeline workflow.
 
-## Decision 3
+## Decision 4 - Bearer JWT for assessment scope
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+Chose:
+Bearer JWT stored client-side for simplicity.
 
-## Decision 4
+Rejected:
+Full httpOnly cookie plus refresh-token architecture.
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+Why:
+The assignment has a constrained 12-hour budget and does not require a production
+identity system. A production version would strengthen token storage against XSS and
+add refresh token rotation.
 
-## Decision 5
+## Decision 5 - Separate authentication from role authorization
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+Chose:
+Use one middleware to authenticate the request and another reusable middleware to
+check roles.
+
+Rejected:
+Combining token verification and role checks into route handlers.
+
+Why:
+Authentication answers who the user is, while authorization answers whether that user
+can access a route. Keeping them separate makes future recruiter-only and
+interviewer-only routes easier to read and maintain.
