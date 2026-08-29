@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 
 import authRouter from './auth.js';
+import demoRouter from './demo.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -15,6 +16,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/demo', demoRouter);
 
 app.use((error, req, res, next) => {
   console.error(error);

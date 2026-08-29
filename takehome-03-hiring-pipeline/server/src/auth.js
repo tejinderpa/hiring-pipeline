@@ -42,7 +42,7 @@ function getBearerToken(req) {
   return token;
 }
 
-function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const token = getBearerToken(req);
 
   if (!token) {
@@ -56,14 +56,37 @@ function authenticate(req, res, next) {
       return res.status(401).json(authenticationRequiredResponse);
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      return res.status(401).json(authenticationRequiredResponse);
+    }
+
     req.auth = {
-      userId: payload.sub,
+      userId: user.id,
+      user: buildSafeUser(user),
     };
 
     return next();
   } catch (error) {
     return res.status(401).json(authenticationRequiredResponse);
   }
+}
+
+export function requireRole(requiredRole) {
+  return function roleMiddleware(req, res, next) {
+    if (!req.auth?.user) {
+      return res.status(401).json(authenticationRequiredResponse);
+    }
+
+    if (req.auth.user.role !== requiredRole) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    return next();
+  };
 }
 
 async function login(req, res, next) {
@@ -103,19 +126,7 @@ async function login(req, res, next) {
 }
 
 async function getCurrentUser(req, res, next) {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.auth.userId },
-    });
-
-    if (!user) {
-      return res.status(401).json(authenticationRequiredResponse);
-    }
-
-    return res.json({ user: buildSafeUser(user) });
-  } catch (error) {
-    return next(error);
-  }
+  return res.json({ user: req.auth.user });
 }
 
 router.post('/login', login);
