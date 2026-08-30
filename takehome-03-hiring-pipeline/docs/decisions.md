@@ -77,3 +77,21 @@ Why:
 Authentication answers who the user is, while authorization answers whether that user
 can access a route. Keeping them separate makes future recruiter-only and
 interviewer-only routes easier to read and maintain.
+
+
+## Decision 6 model archiving with archivedAt
+
+Chose:
+Keep OPEN/CLOSED as the business status and represent archival separately
+through archivedAt.
+
+Rejected:
+Hard deleting openings or treating ARCHIVED as the same type of state as
+OPEN/CLOSED.
+
+Why:
+Closing a job and removing it from the recruiter's default working set are
+different actions. More importantly, the assignment requires archived jobs
+to retain their applications and be restorable. archivedAt preserves the
+record and also tells us when it was archived.
+

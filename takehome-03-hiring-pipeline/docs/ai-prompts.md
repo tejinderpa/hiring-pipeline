@@ -345,3 +345,61 @@ Recommend:
 Keep the API simple.
 
 Do not implement anything.
+
+## Implementing Applications API
+Implement today's Application API.
+
+Required functionality:
+
+POST /api/jobs/:jobId/applications
+PATCH /api/applications/:id
+
+And use the read approach we just selected so opening a job can show its applications.
+
+Rules:
+
+1. All routes require authentication.
+2. Application creation/editing is recruiter-only.
+3. Creating an application requires a valid JobOpening.
+4. Clients may provide only:
+   - candidateName
+   - candidateEmail
+   - source
+   - notes
+5. New applications automatically start at APPLIED.
+6. Clients must NOT be able to provide stage during creation.
+7. PATCH must NOT permit changing stage.
+8. PATCH must NOT permit changing jobOpeningId.
+9. Do not implement stage advancement.
+10. Do not implement rejection or reinstatement.
+11. Do not implement interviewer assignments.
+12. Do not create application history yet.
+
+Reuse the existing error-response style and auth middleware.
+
+Before editing:
+- list the exact files that will change
+
+After implementation show me how to verify:
+- application creation
+- application appears under the correct job
+- application update
+- invalid job id
+- interviewer receives 403
+- unauthenticated request receives 401
+- attempts to manipulate stage are refused or ignored according to the API design
+
+## Adding 2 to 3 Application per opening 
+I want enough development seed data to make today's frontend meaningful.
+
+Do not modify anything yet.
+
+Recommend a very small realistic dataset containing:
+- 3 job openings across different departments
+- a mix of OPEN and CLOSED status
+- several applications across the openings
+- realistic but obviously fictional candidate details
+
+Do not create historical events, interviewer assignments, rejected candidates or future-stage behaviour.
+
+Tell me first how you would integrate this with the existing seed script without breaking the two demo authentication users.

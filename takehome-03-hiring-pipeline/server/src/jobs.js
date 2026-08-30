@@ -7,6 +7,8 @@ const router = Router();
 const allowedStatuses = new Set(['OPEN', 'CLOSED']);
 const editableFields = new Set(['title', 'department', 'description', 'status']);
 const createFields = new Set(['title', 'department', 'description', 'status']);
+const applicationCreateFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.use(authenticate, requireRole('RECRUITER'));
 
@@ -28,6 +30,10 @@ function hasUnknownFields(body, allowedFields) {
 
 function buildJobResponse(job) {
   return { job };
+}
+
+function buildApplicationResponse(application) {
+  return { application };
 }
 
 function validateStatus(status) {
@@ -122,9 +128,57 @@ function buildPatchData(body) {
   return { data };
 }
 
+function buildApplicationCreateData(body, jobOpeningId) {
+  const candidateName = trimString(body.candidateName);
+  const candidateEmail = trimString(body.candidateEmail).toLowerCase();
+  const source = trimString(body.source);
+  const notes = Object.hasOwn(body, 'notes') ? body.notes : null;
+
+  if (!candidateName) {
+    return { error: 'Candidate name is required' };
+  }
+
+  if (!candidateEmail) {
+    return { error: 'Candidate email is required' };
+  }
+
+  if (!emailPattern.test(candidateEmail)) {
+    return { error: 'Candidate email must be a valid email address' };
+  }
+
+  if (!source) {
+    return { error: 'Source is required' };
+  }
+
+  if (notes !== null && typeof notes !== 'string') {
+    return { error: 'Notes must be a string' };
+  }
+
+  return {
+    data: {
+      jobOpeningId,
+      candidateName,
+      candidateEmail,
+      source,
+      notes: trimString(notes) || null,
+    },
+  };
+}
+
 async function findJob(id) {
   return prisma.jobOpening.findUnique({
     where: { id },
+  });
+}
+
+async function findJobWithApplications(id) {
+  return prisma.jobOpening.findUnique({
+    where: { id },
+    include: {
+      applications: {
+        orderBy: { appliedAt: 'desc' },
+      },
+    },
   });
 }
 
@@ -182,13 +236,47 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const job = await findJob(req.params.id);
+    const job = await findJobWithApplications(req.params.id);
 
     if (!job) {
       return res.status(404).json({ error: 'Job opening not found' });
     }
 
     return res.json(buildJobResponse(job));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:jobId/applications', async (req, res, next) => {
+  try {
+    const body = getRequestBody(req);
+
+    if (!body) {
+      return res.status(400).json({ error: 'Request body must be an object' });
+    }
+
+    if (hasUnknownFields(body, applicationCreateFields)) {
+      return res.status(400).json({ error: 'Only candidateName, candidateEmail, source, and notes are allowed' });
+    }
+
+    const existingJob = await findJob(req.params.jobId);
+
+    if (!existingJob) {
+      return res.status(404).json({ error: 'Job opening not found' });
+    }
+
+    const result = buildApplicationCreateData(body, req.params.jobId);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const application = await prisma.application.create({
+      data: result.data,
+    });
+
+    return res.status(201).json(buildApplicationResponse(application));
   } catch (error) {
     return next(error);
   }

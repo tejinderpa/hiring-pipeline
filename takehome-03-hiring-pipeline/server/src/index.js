@@ -2,6 +2,7 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 
+import applicationsRouter from './applications.js';
 import authRouter from './auth.js';
 import demoRouter from './demo.js';
 import jobsRouter from './jobs.js';
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/applications', applicationsRouter);
 app.use('/api/demo', demoRouter);
 app.use('/api/jobs', jobsRouter);
 
