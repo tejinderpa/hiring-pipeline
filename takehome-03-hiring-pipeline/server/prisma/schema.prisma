@@ -11,6 +11,20 @@ enum Role {
   INTERVIEWER
 }
 
+enum JobStatus {
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -18,4 +32,33 @@ model User {
   role         Role
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model JobOpening {
+  id           String        @id @default(uuid())
+  title        String
+  department   String
+  description  String
+  status       JobStatus     @default(OPEN)
+  archivedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  applications Application[]
+}
+
+model Application {
+  id             String           @id @default(uuid())
+  jobOpeningId   String
+  candidateName  String
+  candidateEmail String
+  source         String
+  notes          String?
+  stage          ApplicationStage @default(APPLIED)
+  appliedAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  jobOpening     JobOpening       @relation(fields: [jobOpeningId], references: [id], onDelete: Restrict)
+
+  @@index([jobOpeningId])
 }

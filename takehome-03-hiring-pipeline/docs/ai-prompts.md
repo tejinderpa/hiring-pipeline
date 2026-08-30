@@ -15,7 +15,7 @@ If you did not use AI at all, say so here, and describe your process instead.
 ### What you corrected
 
 
-# Prompt 1 : Starting the project with Global Prompt
+# 29 August : Starting the project with Global Prompt
 ## TechStack and Constraints
 I'm building a take-home hiring pipeline assignment using:
 
@@ -246,3 +246,63 @@ Afterward show me exactly how to verify:
 - valid token
 - no token
 - invalid token
+
+
+# 30 August : Working on Job openings section
+## Thinking about Schema
+Let's design today's database models before editing anything.
+
+Do not modify files.
+
+I currently need two new models:
+
+JobOpening
+
+Required concepts:
+- id
+- title
+- department
+- description
+- status
+- archivedAt
+- createdAt
+- updatedAt
+
+Application
+
+Required concepts:
+- id
+- jobOpeningId
+- candidateName
+- candidateEmail
+- source
+- notes
+- stage
+- appliedAt
+- updatedAt
+
+Requirements:
+
+- one JobOpening has many Applications
+- each Application belongs to exactly one JobOpening
+- archiving a JobOpening must never delete its Applications
+- applications should start at APPLIED
+- I am NOT implementing stage transitions today
+
+Please recommend:
+
+1. exact Prisma field types
+2. JobOpening status representation
+3. Application stage representation
+4. nullable versus required fields
+5. relationship and foreign-key behavior
+6. useful indexes or constraints that are genuinely justified today
+
+Also specifically explain:
+
+- why archivedAt is preferable to isDeleted here
+- whether OPEN/CLOSED should be separate from archived state
+- whether candidate email should be globally unique, unique per job, or not unique at all
+- whether notes should be optional
+
+Do not implement anything.
