@@ -306,3 +306,42 @@ Also specifically explain:
 - whether notes should be optional
 
 Do not implement anything.
+
+## Designing Job Opening API
+The database models are working.
+
+Now help me design only the Job Opening API.
+
+Do not edit files.
+
+I need these recruiter-only operations:
+
+POST   /api/jobs
+GET    /api/jobs
+GET    /api/jobs/:id
+PATCH  /api/jobs/:id
+
+POST   /api/jobs/:id/archive
+POST   /api/jobs/:id/restore
+
+Requirements:
+
+- every endpoint requires authentication
+- only recruiters can manage job openings
+- GET /api/jobs should hide archived openings by default
+- there still needs to be a straightforward way for the frontend to request archived openings so recruiters can restore them
+- GET /api/jobs/:id should return one opening
+- PATCH should edit normal opening fields
+- archive and restore should be explicit operations rather than arbitrary archivedAt changes from PATCH
+- applications must never be deleted by archive
+
+Recommend:
+1. request/response shapes
+2. validation rules
+3. status codes
+4. error cases
+5. how archived records should be requested
+
+Keep the API simple.
+
+Do not implement anything.
