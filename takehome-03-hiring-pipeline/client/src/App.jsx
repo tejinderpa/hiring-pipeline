@@ -33,12 +33,14 @@ function getDisplayName(user) {
 }
 
 async function requestJson(path, options = {}) {
+  const { headers, ...fetchOptions } = options;
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...headers,
     },
-    ...options,
   });
   const data = await response.json().catch(() => ({}));
 
