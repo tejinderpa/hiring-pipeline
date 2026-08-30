@@ -403,3 +403,129 @@ Recommend a very small realistic dataset containing:
 Do not create historical events, interviewer assignments, rejected candidates or future-stage behaviour.
 
 Tell me first how you would integrate this with the existing seed script without breaking the two demo authentication users.
+
+## Designing Frontend for Job Openings
+Design the Job Openings page for an internal B2B hiring pipeline application.
+
+Use the same visual style as the existing application:
+- professional
+- clean
+- light theme
+- restrained B2B SaaS styling
+- desktop-first
+- consistent sidebar/navigation
+
+Page title:
+Job Openings
+
+Purpose:
+A recruiter uses this page to manage positions currently being hired for.
+
+Primary action:
+Create Job Opening
+
+Each job should clearly show:
+- title
+- department
+- OPEN or CLOSED status
+- number of applications
+- last updated date
+
+Useful actions:
+- Open
+- Edit
+- Archive
+
+Default page should show non-archived openings.
+
+Include a simple way to switch to or view Archived openings so recruiters can restore them.
+
+Archived rows should provide:
+- View
+- Restore
+
+Create/edit should use a clean form or modal containing:
+- title
+- department
+- description
+- status
+
+Do not include:
+- pipeline board
+- interviewer assignments
+- dashboard charts
+- candidate search
+- bulk actions
+- alerts
+- fake analytics
+
+Focus only on managing job openings.
+
+## Routes /jobs and /jobs/:id
+see if something left : Implement the recruiter Job Openings page at /jobs.
+Functional requirements:
+- fetch non-archived jobs from the real backend
+- display loading state
+- display error state
+- display useful empty state
+- create opening
+- edit opening
+- archive opening
+- switch/view archived openings
+- restore archived opening
+- navigate to /jobs/:id when opening a job
+Use the existing authenticated API/token handling.
+The UI should respect recruiter access, but remember that actual authorization already exists on the server.
+Do not implement applications on this step.
+Do not build candidate search.
+Do not create dashboard functionality.
+Before editing:
+- list files being changed
+After implementation:
+- explain data flow
+- tell me exactly what browser actions I should test   
+  The Job Openings page works.
+  Now implement /jobs/:id.
+  Requirements:
+  Opening header:
+  - title
+  - department
+  - description
+  - OPEN/CLOSED status
+  - edit action
+  - archive action
+  Applications section:
+  - candidate name
+  - email
+  - source
+  - current stage
+  - applied date
+  - edit action
+  Actions:
+  - Add Candidate
+  - Edit Candidate
+  Add/Edit Candidate fields:
+  - candidateName
+  - candidateEmail
+  - source
+  - notes
+  Important:
+  - stage is display-only
+  - do not add advance controls
+  - do not add reject controls
+  - do not add interviewer controls
+  - do not add timeline
+  - do not add bulk selection
+  Use real backend data.
+  Add:
+  - loading state
+  - job-not-found state
+  - no-applications empty state
+  - API error handling
+  Before editing list all files being changed.
+  After implementation explain:
+  1. page load data flow
+  2. create application data flow
+  3. edit application data flow
+  4. how the frontend prevents stage editing
+  5. why the server is still the real enforcement layer

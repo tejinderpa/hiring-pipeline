@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
+
+import JobDetailPage from './pages/JobDetailPage.jsx';
+import JobOpeningsPage from './pages/JobOpeningsPage.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 const AUTH_TOKEN_KEY = 'hiringPipelineToken';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const navigationItems = [
-  { label: 'Dashboard', icon: DashboardIcon, isActive: true },
-  { label: 'Job Openings', icon: BriefcaseIcon },
-  { label: 'Candidates', icon: UsersIcon },
-  { label: 'Alerts', icon: BellIcon },
+  { label: 'Dashboard', icon: DashboardIcon, path: '/' },
+  { label: 'Job Openings', icon: BriefcaseIcon, path: '/jobs', roles: ['RECRUITER'] },
+  { label: 'Candidates', icon: UsersIcon, path: '/candidates' },
+  { label: 'Alerts', icon: BellIcon, path: '/alerts' },
 ];
 
 function getDisplayName(user) {
@@ -159,19 +162,22 @@ function UserAvatar({ name }) {
 
 function SidebarNavItem({ item }) {
   const Icon = item.icon;
-  const activeClasses = item.isActive
-    ? 'border-cyan-700/20 bg-cyan-50 text-cyan-900'
-    : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950';
 
   return (
-    <a
-      aria-current={item.isActive ? 'page' : undefined}
-      className={`flex h-10 shrink-0 items-center gap-3 rounded-md border px-3 text-sm font-medium transition ${activeClasses}`}
-      href="#"
+    <NavLink
+      className={({ isActive }) => {
+        const activeClasses = isActive
+          ? 'border-cyan-700/20 bg-cyan-50 text-cyan-900'
+          : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950';
+
+        return `flex h-10 shrink-0 items-center gap-3 rounded-md border px-3 text-sm font-medium transition ${activeClasses}`;
+      }}
+      end={item.path === '/'}
+      to={item.path}
     >
       <Icon />
       <span>{item.label}</span>
-    </a>
+    </NavLink>
   );
 }
 
@@ -372,8 +378,32 @@ function ProtectedRoute({ authStatus, user, children }) {
   return children;
 }
 
+function PlaceholderPage({ icon: Icon, title }) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-5 py-12 lg:px-8">
+      <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-md bg-cyan-50 text-cyan-800">
+          <Icon />
+        </div>
+        <p className="text-lg font-semibold text-slate-950">{title}</p>
+      </div>
+    </div>
+  );
+}
+
+function RecruiterOnlyRoute({ user, children }) {
+  if (user.role !== 'RECRUITER') {
+    return <PlaceholderPage icon={BriefcaseIcon} title="You do not have access to job openings." />;
+  }
+
+  return children;
+}
+
 function AppLayout({ user, onLogout }) {
   const displayName = getDisplayName(user);
+  const visibleNavigationItems = navigationItems.filter((item) => (
+    !item.roles || item.roles.includes(user.role)
+  ));
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -389,7 +419,7 @@ function AppLayout({ user, onLogout }) {
             </div>
 
             <nav className="flex gap-2 overflow-x-auto px-4 py-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:px-4 lg:py-5">
-              {navigationItems.map((item) => (
+              {visibleNavigationItems.map((item) => (
                 <SidebarNavItem item={item} key={item.label} />
               ))}
             </nav>
@@ -436,16 +466,7 @@ function AppLayout({ user, onLogout }) {
             </div>
           </header>
 
-          <div className="flex flex-1 items-center justify-center px-5 py-12 lg:px-8">
-            <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
-              <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-md bg-cyan-50 text-cyan-800">
-                <DashboardIcon />
-              </div>
-              <p className="text-lg font-semibold text-slate-950">
-                Your recruiting workspace is ready.
-              </p>
-            </div>
-          </div>
+          <Outlet />
         </section>
       </div>
     </main>
@@ -511,7 +532,36 @@ function App() {
           </ProtectedRoute>
         )}
         path="/"
-      />
+      >
+        <Route
+          index
+          element={<PlaceholderPage icon={DashboardIcon} title="Your recruiting workspace is ready." />}
+        />
+        <Route
+          element={(
+            <RecruiterOnlyRoute user={user}>
+              <JobOpeningsPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+            </RecruiterOnlyRoute>
+          )}
+          path="jobs"
+        />
+        <Route
+          element={(
+            <RecruiterOnlyRoute user={user}>
+              <JobDetailPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+            </RecruiterOnlyRoute>
+          )}
+          path="jobs/:id"
+        />
+        <Route
+          element={<PlaceholderPage icon={UsersIcon} title="Candidates are not part of today's scope." />}
+          path="candidates"
+        />
+        <Route
+          element={<PlaceholderPage icon={BellIcon} title="Alerts are not part of today's scope." />}
+          path="alerts"
+        />
+      </Route>
       <Route element={<Navigate replace to="/" />} path="*" />
     </Routes>
   );
