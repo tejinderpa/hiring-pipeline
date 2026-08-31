@@ -10,6 +10,10 @@ const editableFields = new Set(['title', 'department', 'description', 'status'])
 const createFields = new Set(['title', 'department', 'description', 'status']);
 const applicationCreateFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const applicationTransactionOptions = {
+  maxWait: 10000,
+  timeout: 20000,
+};
 
 router.use(authenticate, requireRole('RECRUITER'));
 
@@ -273,17 +277,20 @@ router.post('/:jobId/applications', async (req, res, next) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const application = await prisma.$transaction(async (tx) => {
-      const createdApplication = await tx.application.create({
-        data: result.data,
-      });
+    const application = await prisma.$transaction(
+      async (tx) => {
+        const createdApplication = await tx.application.create({
+          data: result.data,
+        });
 
-      await tx.applicationEvent.create({
-        data: buildApplicationCreatedEventData(createdApplication, req.auth.userId),
-      });
+        await tx.applicationEvent.create({
+          data: buildApplicationCreatedEventData(createdApplication, req.auth.userId),
+        });
 
-      return createdApplication;
-    });
+        return createdApplication;
+      },
+      applicationTransactionOptions,
+    );
 
     return res.status(201).json(buildApplicationResponse(application));
   } catch (error) {

@@ -11,6 +11,10 @@ import { prisma } from './prisma.js';
 const router = Router();
 const applicationEditableFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const applicationTransactionOptions = {
+  maxWait: 10000,
+  timeout: 20000,
+};
 
 router.use(authenticate, requireRole('RECRUITER'));
 
@@ -101,32 +105,35 @@ async function findApplication(id) {
 }
 
 async function updateApplicationWithEvent(applicationId, actorId, buildTransition) {
-  return prisma.$transaction(async (tx) => {
-    const existingApplication = await tx.application.findUnique({
-      where: { id: applicationId },
-    });
+  return prisma.$transaction(
+    async (tx) => {
+      const existingApplication = await tx.application.findUnique({
+        where: { id: applicationId },
+      });
 
-    if (!existingApplication) {
-      return { status: 404, error: 'Application not found' };
-    }
+      if (!existingApplication) {
+        return { status: 404, error: 'Application not found' };
+      }
 
-    const transition = buildTransition(existingApplication, actorId);
+      const transition = buildTransition(existingApplication, actorId);
 
-    if (transition.error) {
-      return { status: 409, error: transition.error };
-    }
+      if (transition.error) {
+        return { status: 409, error: transition.error };
+      }
 
-    const application = await tx.application.update({
-      where: { id: applicationId },
-      data: transition.applicationData,
-    });
+      const application = await tx.application.update({
+        where: { id: applicationId },
+        data: transition.applicationData,
+      });
 
-    await tx.applicationEvent.create({
-      data: transition.eventData,
-    });
+      await tx.applicationEvent.create({
+        data: transition.eventData,
+      });
 
-    return { application };
-  });
+      return { application };
+    },
+    applicationTransactionOptions,
+  );
 }
 
 async function sendTransitionResponse(req, res, next, buildTransition) {
