@@ -95,3 +95,58 @@ different actions. More importantly, the assignment requires archived jobs
 to retain their applications and be restorable. archivedAt preserves the
 record and also tells us when it was archived.
 
+## Decision 7 - Action endpoints instead of arbitrary stage PATCH
+
+Chose:
+Dedicated pipeline endpoints: `advance`, `reject`, and `reinstate`.
+
+Rejected:
+Allowing clients to send arbitrary `stage` values through generic application PATCH.
+
+Why:
+Stage changes are business actions, not ordinary field edits. The server needs to own the legal transition, preserve rejection state, and write an immutable history event for each state change.
+
+## Decision 8 - Centralized next-stage map
+
+Chose:
+Put the forward pipeline rule in one domain helper with a simple map:
+`APPLIED -> SCREENING -> INTERVIEW -> OFFER -> HIRED`.
+
+Rejected:
+Repeating transition conditionals inside each route handler.
+
+Why:
+The allowed forward path is small but important. Keeping it centralized makes it easier to audit and prevents one route from drifting from another.
+
+## Decision 9 - Store rejectedFromStage on Application
+
+Chose:
+Store the stage a candidate was rejected from in `Application.rejectedFromStage`.
+
+Rejected:
+Always reinstating candidates to `APPLIED`, or deriving the previous stage from history during reinstatement.
+
+Why:
+The assignment requires reinstatement to return to the exact previous stage. Storing that value makes the write path deterministic and fails safely if the value is unexpectedly missing.
+
+## Decision 10 - Append-only ApplicationEvent history
+
+Chose:
+Use an `ApplicationEvent` table for creation, stage changes, rejection, reinstatement, and future feedback events.
+
+Rejected:
+Mutable history fields on `Application`, or update/delete APIs for history rows.
+
+Why:
+Application history is audit data. Appending events preserves what happened over time and avoids allowing users to rewrite the timeline through the public API.
+
+## Decision 11 - State mutation and event insertion in one transaction
+
+Chose:
+Wrap application creation or stage mutation together with event creation in a Prisma transaction.
+
+Rejected:
+Updating the application first and creating the event in a separate follow-up query.
+
+Why:
+Those operations must succeed or fail together. Testing against the hosted database also showed that the transaction start wait needed to be more tolerant of remote pool latency, so the application-history transactions now use an explicit wait budget.
