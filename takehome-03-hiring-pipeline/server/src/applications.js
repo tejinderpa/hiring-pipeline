@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { buildApplicationAdvanceData } from './applicationPipeline.js';
 import { authenticate, requireRole } from './auth.js';
 import { prisma } from './prisma.js';
 
@@ -32,6 +33,10 @@ function buildApplicationResponse(application) {
 function buildApplicationPatchData(body) {
   if (Object.keys(body).length === 0) {
     return { error: 'At least one field is required' };
+  }
+
+  if (Object.hasOwn(body, 'stage')) {
+    return { error: 'Application stage cannot be changed directly. Use the pipeline transition endpoints.' };
   }
 
   if (hasUnknownFields(body, applicationEditableFields)) {
@@ -85,6 +90,37 @@ function buildApplicationPatchData(body) {
   return { data };
 }
 
+async function findApplication(id) {
+  return prisma.application.findUnique({
+    where: { id },
+  });
+}
+
+router.post('/:id/advance', async (req, res, next) => {
+  try {
+    const existingApplication = await findApplication(req.params.id);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const result = buildApplicationAdvanceData(existingApplication);
+
+    if (result.error) {
+      return res.status(409).json({ error: result.error });
+    }
+
+    const application = await prisma.application.update({
+      where: { id: req.params.id },
+      data: result.data,
+    });
+
+    return res.json(buildApplicationResponse(application));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.patch('/:id', async (req, res, next) => {
   try {
     const body = getRequestBody(req);
@@ -99,9 +135,7 @@ router.patch('/:id', async (req, res, next) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const existingApplication = await prisma.application.findUnique({
-      where: { id: req.params.id },
-    });
+    const existingApplication = await findApplication(req.params.id);
 
     if (!existingApplication) {
       return res.status(404).json({ error: 'Application not found' });
