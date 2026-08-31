@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   buildApplicationAdvanceData,
+  buildApplicationReinstateData,
   buildApplicationRejectData,
 } from './applicationPipeline.js';
 import { authenticate, requireRole } from './auth.js';
@@ -133,6 +134,31 @@ router.post('/:id/reject', async (req, res, next) => {
     }
 
     const result = buildApplicationRejectData(existingApplication);
+
+    if (result.error) {
+      return res.status(409).json({ error: result.error });
+    }
+
+    const application = await prisma.application.update({
+      where: { id: req.params.id },
+      data: result.data,
+    });
+
+    return res.json(buildApplicationResponse(application));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:id/reinstate', async (req, res, next) => {
+  try {
+    const existingApplication = await findApplication(req.params.id);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const result = buildApplicationReinstateData(existingApplication);
 
     if (result.error) {
       return res.status(409).json({ error: result.error });

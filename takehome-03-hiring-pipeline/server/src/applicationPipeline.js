@@ -39,3 +39,24 @@ export function buildApplicationRejectData(application) {
     },
   };
 }
+
+export function buildApplicationReinstateData(application) {
+  if (application.stage !== 'REJECTED') {
+    return {
+      error: 'Only rejected applications can be reinstated',
+    };
+  }
+
+  if (!application.rejectedFromStage) {
+    return {
+      error: 'Cannot reinstate application because rejectedFromStage is missing',
+    };
+  }
+
+  return {
+    data: {
+      stage: application.rejectedFromStage,
+      rejectedFromStage: null,
+    },
+  };
+}
