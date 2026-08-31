@@ -25,6 +25,14 @@ enum ApplicationStage {
   REJECTED
 }
 
+enum ApplicationEventType {
+  APPLICATION_CREATED
+  STAGE_CHANGED
+  REJECTED
+  REINSTATED
+  FEEDBACK_ADDED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -32,6 +40,8 @@ model User {
   role         Role
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  applicationEvents ApplicationEvent[] @relation("ApplicationEventActor")
 }
 
 model JobOpening {
@@ -60,6 +70,24 @@ model Application {
   updatedAt      DateTime         @updatedAt
 
   jobOpening     JobOpening       @relation(fields: [jobOpeningId], references: [id], onDelete: Restrict)
+  events         ApplicationEvent[]
 
   @@index([jobOpeningId])
+}
+
+model ApplicationEvent {
+  id            String               @id @default(uuid())
+  applicationId String
+  type          ApplicationEventType
+  actorId       String
+  oldStage      ApplicationStage?
+  newStage      ApplicationStage?
+  metadata      Json?
+  createdAt     DateTime             @default(now())
+
+  application   Application          @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  actor         User                 @relation("ApplicationEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@index([actorId])
 }

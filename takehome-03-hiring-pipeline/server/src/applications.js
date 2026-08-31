@@ -100,57 +100,66 @@ async function findApplication(id) {
   });
 }
 
-router.post('/:id/advance', async (req, res, next) => {
-  try {
-    const existingApplication = await findApplication(req.params.id);
-
-    if (!existingApplication) {
-      return res.status(404).json({ error: 'Application not found' });
-    }
-
-    const result = buildApplicationAdvanceData(existingApplication);
-
-    if (result.error) {
-      return res.status(409).json({ error: result.error });
-    }
-
-    const application = await prisma.application.update({
-      where: { id: req.params.id },
-      data: result.data,
+async function updateApplicationWithEvent(applicationId, actorId, buildTransition) {
+  return prisma.$transaction(async (tx) => {
+    const existingApplication = await tx.application.findUnique({
+      where: { id: applicationId },
     });
 
-    return res.json(buildApplicationResponse(application));
+    if (!existingApplication) {
+      return { status: 404, error: 'Application not found' };
+    }
+
+    const transition = buildTransition(existingApplication, actorId);
+
+    if (transition.error) {
+      return { status: 409, error: transition.error };
+    }
+
+    const application = await tx.application.update({
+      where: { id: applicationId },
+      data: transition.applicationData,
+    });
+
+    await tx.applicationEvent.create({
+      data: transition.eventData,
+    });
+
+    return { application };
+  });
+}
+
+async function sendTransitionResponse(req, res, next, buildTransition) {
+  try {
+    const result = await updateApplicationWithEvent(
+      req.params.id,
+      req.auth.userId,
+      buildTransition,
+    );
+
+    if (result.error) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    return res.json(buildApplicationResponse(result.application));
   } catch (error) {
     return next(error);
   }
+}
+
+router.post('/:id/advance', async (req, res, next) => {
+  return sendTransitionResponse(req, res, next, buildApplicationAdvanceData);
 });
 
 router.post('/:id/reject', async (req, res, next) => {
-  try {
-    const existingApplication = await findApplication(req.params.id);
-
-    if (!existingApplication) {
-      return res.status(404).json({ error: 'Application not found' });
-    }
-
-    const result = buildApplicationRejectData(existingApplication);
-
-    if (result.error) {
-      return res.status(409).json({ error: result.error });
-    }
-
-    const application = await prisma.application.update({
-      where: { id: req.params.id },
-      data: result.data,
-    });
-
-    return res.json(buildApplicationResponse(application));
-  } catch (error) {
-    return next(error);
-  }
+  return sendTransitionResponse(req, res, next, buildApplicationRejectData);
 });
 
 router.post('/:id/reinstate', async (req, res, next) => {
+  return sendTransitionResponse(req, res, next, buildApplicationReinstateData);
+});
+
+router.get('/:id/history', async (req, res, next) => {
   try {
     const existingApplication = await findApplication(req.params.id);
 
@@ -158,18 +167,21 @@ router.post('/:id/reinstate', async (req, res, next) => {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    const result = buildApplicationReinstateData(existingApplication);
-
-    if (result.error) {
-      return res.status(409).json({ error: result.error });
-    }
-
-    const application = await prisma.application.update({
-      where: { id: req.params.id },
-      data: result.data,
+    const events = await prisma.applicationEvent.findMany({
+      where: { applicationId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        actor: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
     });
 
-    return res.json(buildApplicationResponse(application));
+    return res.json({ events });
   } catch (error) {
     return next(error);
   }

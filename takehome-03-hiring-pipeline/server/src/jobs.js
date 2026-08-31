@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { buildApplicationCreatedEventData } from './applicationPipeline.js';
 import { authenticate, requireRole } from './auth.js';
 import { prisma } from './prisma.js';
 
@@ -272,8 +273,16 @@ router.post('/:jobId/applications', async (req, res, next) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const application = await prisma.application.create({
-      data: result.data,
+    const application = await prisma.$transaction(async (tx) => {
+      const createdApplication = await tx.application.create({
+        data: result.data,
+      });
+
+      await tx.applicationEvent.create({
+        data: buildApplicationCreatedEventData(createdApplication, req.auth.userId),
+      });
+
+      return createdApplication;
     });
 
     return res.status(201).json(buildApplicationResponse(application));

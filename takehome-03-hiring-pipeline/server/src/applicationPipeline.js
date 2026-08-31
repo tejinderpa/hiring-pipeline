@@ -9,7 +9,33 @@ export function getNextApplicationStage(stage) {
   return nextStageByStage[stage] ?? null;
 }
 
-export function buildApplicationAdvanceData(application) {
+function buildApplicationEventData(application, actorId, type, oldStage, newStage, metadata = null) {
+  const eventData = {
+    applicationId: application.id,
+    type,
+    actorId,
+    oldStage,
+    newStage,
+  };
+
+  if (metadata !== null) {
+    eventData.metadata = metadata;
+  }
+
+  return eventData;
+}
+
+export function buildApplicationCreatedEventData(application, actorId) {
+  return buildApplicationEventData(
+    application,
+    actorId,
+    'APPLICATION_CREATED',
+    null,
+    application.stage,
+  );
+}
+
+export function buildApplicationAdvanceData(application, actorId) {
   const nextStage = getNextApplicationStage(application.stage);
 
   if (!nextStage) {
@@ -19,13 +45,20 @@ export function buildApplicationAdvanceData(application) {
   }
 
   return {
-    data: {
+    applicationData: {
       stage: nextStage,
     },
+    eventData: buildApplicationEventData(
+      application,
+      actorId,
+      'STAGE_CHANGED',
+      application.stage,
+      nextStage,
+    ),
   };
 }
 
-export function buildApplicationRejectData(application) {
+export function buildApplicationRejectData(application, actorId) {
   if (application.stage === 'REJECTED') {
     return {
       error: 'Application has already been rejected',
@@ -33,14 +66,21 @@ export function buildApplicationRejectData(application) {
   }
 
   return {
-    data: {
+    applicationData: {
       stage: 'REJECTED',
       rejectedFromStage: application.stage,
     },
+    eventData: buildApplicationEventData(
+      application,
+      actorId,
+      'REJECTED',
+      application.stage,
+      'REJECTED',
+    ),
   };
 }
 
-export function buildApplicationReinstateData(application) {
+export function buildApplicationReinstateData(application, actorId) {
   if (application.stage !== 'REJECTED') {
     return {
       error: 'Only rejected applications can be reinstated',
@@ -54,9 +94,16 @@ export function buildApplicationReinstateData(application) {
   }
 
   return {
-    data: {
+    applicationData: {
       stage: application.rejectedFromStage,
       rejectedFromStage: null,
     },
+    eventData: buildApplicationEventData(
+      application,
+      actorId,
+      'REINSTATED',
+      'REJECTED',
+      application.rejectedFromStage,
+    ),
   };
 }
