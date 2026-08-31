@@ -55,6 +55,7 @@ model Application {
   source         String
   notes          String?
   stage          ApplicationStage @default(APPLIED)
+  rejectedFromStage ApplicationStage?
   appliedAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

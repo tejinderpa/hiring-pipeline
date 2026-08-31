@@ -24,3 +24,18 @@ export function buildApplicationAdvanceData(application) {
     },
   };
 }
+
+export function buildApplicationRejectData(application) {
+  if (application.stage === 'REJECTED') {
+    return {
+      error: 'Application has already been rejected',
+    };
+  }
+
+  return {
+    data: {
+      stage: 'REJECTED',
+      rejectedFromStage: application.stage,
+    },
+  };
+}

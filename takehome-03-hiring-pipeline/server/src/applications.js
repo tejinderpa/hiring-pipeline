@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
-import { buildApplicationAdvanceData } from './applicationPipeline.js';
+import {
+  buildApplicationAdvanceData,
+  buildApplicationRejectData,
+} from './applicationPipeline.js';
 import { authenticate, requireRole } from './auth.js';
 import { prisma } from './prisma.js';
 
@@ -105,6 +108,31 @@ router.post('/:id/advance', async (req, res, next) => {
     }
 
     const result = buildApplicationAdvanceData(existingApplication);
+
+    if (result.error) {
+      return res.status(409).json({ error: result.error });
+    }
+
+    const application = await prisma.application.update({
+      where: { id: req.params.id },
+      data: result.data,
+    });
+
+    return res.json(buildApplicationResponse(application));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:id/reject', async (req, res, next) => {
+  try {
+    const existingApplication = await findApplication(req.params.id);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const result = buildApplicationRejectData(existingApplication);
 
     if (result.error) {
       return res.status(409).json({ error: result.error });
