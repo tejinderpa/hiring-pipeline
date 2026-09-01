@@ -529,3 +529,20 @@ After implementation:
   3. edit application data flow
   4. how the frontend prevents stage editing
   5. why the server is still the real enforcement layer
+
+# 1 September : Requirement 5 interviewer panel and feedback
+
+## Interviewer assignment schema
+Asked to add the database foundation for `ApplicationInterviewer` and `Feedback`, using an explicit join model with `assignedAt`, duplicate assignment prevention, and foreign keys to `Application` and `User`.
+
+Implemented the Prisma models and migration, kept role validation out of the database schema, inspected the existing `ApplicationEvent` timeline model, and left feedback timeline wiring for the next step.
+
+## Interviewer assignment API
+Asked to implement recruiter-only assignment/removal endpoints and an interviewer-only `GET /interviewer/applications` endpoint. The important security requirement was that the interviewer list must be scoped by the authenticated JWT user, not by client input.
+
+Implemented `POST /api/applications/:id/interviewers`, `DELETE /api/applications/:id/interviewers/:userId`, and `GET /api/interviewer/applications`, then verified role checks, duplicate assignment handling, and database-level list scoping with live API checks.
+
+## Interviewer feedback API and timeline
+Asked to implement `POST /api/applications/:id/feedback`, require an assigned interviewer, derive `interviewerId` from the authenticated user, create `Feedback`, and append a `FEEDBACK_ADDED` timeline event.
+
+Implemented the feedback route using the existing auth middleware, `ApplicationInterviewer` assignment lookup, `Feedback` table, and `ApplicationEvent` timeline. Kept feedback immutable by adding no edit or delete routes.

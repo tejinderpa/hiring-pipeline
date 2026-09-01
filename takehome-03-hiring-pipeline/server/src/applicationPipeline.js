@@ -35,6 +35,20 @@ export function buildApplicationCreatedEventData(application, actorId) {
   );
 }
 
+export function buildFeedbackAddedEventData(applicationId, actorId, feedback) {
+  return buildApplicationEventData(
+    { id: applicationId },
+    actorId,
+    'FEEDBACK_ADDED',
+    null,
+    null,
+    {
+      feedbackId: feedback.id,
+      content: feedback.content,
+    },
+  );
+}
+
 export function buildApplicationAdvanceData(application, actorId) {
   const nextStage = getNextApplicationStage(application.stage);
 

@@ -14,6 +14,8 @@
 Relationships:
 
 - One `User` can be the actor for many `ApplicationEvent` rows through `ApplicationEvent.actorId`.
+- One `User` can be assigned to many applications through `ApplicationInterviewer`.
+- One interviewer `User` can leave many `Feedback` rows.
 
 ## JobOpening
 
@@ -52,6 +54,8 @@ Relationships:
 
 - Each `Application` belongs to exactly one `JobOpening`.
 - One `Application` has many `ApplicationEvent` rows.
+- One `Application` can have many interviewer assignments through `ApplicationInterviewer`.
+- One `Application` can have many `Feedback` rows.
 
 `Application.stage` is the current state only. The server owns stage changes through action endpoints, not generic PATCH. The normal advancement path is:
 
@@ -60,6 +64,38 @@ APPLIED -> SCREENING -> INTERVIEW -> OFFER -> HIRED
 ```
 
 `REJECTED` is outside that forward path. `rejectedFromStage` is deliberately stored so reinstatement is deterministic: a candidate rejected from `INTERVIEW` returns to `INTERVIEW`, not an assumed default like `APPLIED`.
+
+## ApplicationInterviewer
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `applicationId` | String | Foreign key to `Application` |
+| `interviewerId` | String | Foreign key to `User` |
+| `assignedAt` | DateTime | Set when the interviewer is assigned |
+
+Relationships:
+
+- Explicit many-to-many join between `Application` and interviewer `User` records.
+- The composite primary key on `applicationId, interviewerId` prevents duplicate assignments.
+
+`INTERVIEWER` role eligibility is enforced in application code, not as a database constraint, because it depends on the mutable `User.role` field and belongs with route/service authorization rules.
+
+## Feedback
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | String / UUID | Primary key |
+| `applicationId` | String | Foreign key to `Application` |
+| `interviewerId` | String | Foreign key to `User` |
+| `content` | String | Required immutable feedback text |
+| `createdAt` | DateTime | Set when feedback is created |
+
+Relationships:
+
+- Each `Feedback` row belongs to exactly one `Application`.
+- Each `Feedback` row belongs to exactly one interviewer `User`.
+- One `Application` can have many feedback entries.
+- One interviewer can leave feedback on many assigned applications.
 
 ## ApplicationEvent
 
@@ -90,6 +126,9 @@ Relationships:
 Indexes:
 
 - `Application.jobOpeningId` for fetching applications under a job.
+- `ApplicationInterviewer.interviewerId` for fetching an interviewer's assigned applications.
+- `Feedback.applicationId, createdAt` for chronological feedback reads.
+- `Feedback.interviewerId` for interviewer feedback lookups.
 - `ApplicationEvent.applicationId, createdAt` for chronological application timelines.
 - `ApplicationEvent.actorId` for future actor-based audit queries.
 
@@ -99,11 +138,14 @@ Database-level constraints:
 
 - Primary keys, foreign keys, enum values, and required fields.
 - `User.email` uniqueness.
-- Referential integrity between jobs, applications, events, and actor users.
+- Referential integrity between jobs, applications, interviewer assignments, feedback, events, and users.
+- Duplicate interviewer assignments are prevented by the `ApplicationInterviewer` composite primary key.
 
 Application-level constraints:
 
 - Authentication and recruiter-only authorization.
+- Interviewer-only authorization and assignment checks for feedback.
+- Enforcing that only users with role `INTERVIEWER` can be assigned to an application.
 - Validating request body fields and email format.
 - Preventing direct `stage` changes through generic application PATCH.
 - Enforcing the legal pipeline transitions.

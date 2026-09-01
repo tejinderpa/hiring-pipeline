@@ -150,3 +150,14 @@ Updating the application first and creating the event in a separate follow-up qu
 
 Why:
 Those operations must succeed or fail together. Testing against the hosted database also showed that the transaction start wait needed to be more tolerant of remote pool latency, so the application-history transactions now use an explicit wait budget.
+
+## Decision 12 - Explicit interviewer assignment join model
+
+Chose:
+Model interviewer panels with an explicit `ApplicationInterviewer` join table.
+
+Rejected:
+Prisma's implicit many-to-many relationship between `Application` and `User`.
+
+Why:
+The assignment needs `assignedAt` as relationship metadata, and the explicit model gives clear database constraints plus straightforward authorization queries for "is this interviewer assigned to this application?"

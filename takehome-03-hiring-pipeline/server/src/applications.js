@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   buildApplicationAdvanceData,
+  buildFeedbackAddedEventData,
   buildApplicationReinstateData,
   buildApplicationRejectData,
 } from './applicationPipeline.js';
@@ -11,13 +12,12 @@ import { prisma } from './prisma.js';
 const router = Router();
 const applicationEditableFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
 const applicationInterviewerCreateFields = new Set(['interviewerId']);
+const feedbackCreateFields = new Set(['content']);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const applicationTransactionOptions = {
   maxWait: 10000,
   timeout: 20000,
 };
-
-router.use(authenticate, requireRole('RECRUITER'));
 
 function trimString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -55,6 +55,20 @@ function buildApplicationInterviewerData(body) {
   }
 
   return { interviewerId };
+}
+
+function buildFeedbackCreateData(body) {
+  if (hasUnknownFields(body, feedbackCreateFields)) {
+    return { error: 'Only content is allowed' };
+  }
+
+  const content = trimString(body.content);
+
+  if (!content) {
+    return { error: 'Content is required' };
+  }
+
+  return { content };
 }
 
 function buildApplicationPatchData(body) {
@@ -172,6 +186,72 @@ async function sendTransitionResponse(req, res, next, buildTransition) {
     return next(error);
   }
 }
+
+router.post('/:id/feedback', authenticate, requireRole('INTERVIEWER'), async (req, res, next) => {
+  try {
+    const body = getRequestBody(req);
+
+    if (!body) {
+      return res.status(400).json({ error: 'Request body must be an object' });
+    }
+
+    const result = buildFeedbackCreateData(body);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const feedbackResult = await prisma.$transaction(
+      async (tx) => {
+        const existingApplication = await tx.application.findUnique({
+          where: { id: req.params.id },
+        });
+
+        if (!existingApplication) {
+          return { status: 404, error: 'Application not found' };
+        }
+
+        const assignment = await tx.applicationInterviewer.findUnique({
+          where: {
+            applicationId_interviewerId: {
+              applicationId: req.params.id,
+              interviewerId: req.auth.userId,
+            },
+          },
+        });
+
+        if (!assignment) {
+          return { status: 403, error: 'Forbidden' };
+        }
+
+        const feedback = await tx.feedback.create({
+          data: {
+            applicationId: req.params.id,
+            interviewerId: req.auth.userId,
+            content: result.content,
+          },
+        });
+
+        await tx.applicationEvent.create({
+          data: buildFeedbackAddedEventData(req.params.id, req.auth.userId, feedback),
+        });
+
+        return { feedback };
+      },
+      applicationTransactionOptions,
+    );
+
+    if (feedbackResult.error) {
+      return res.status(feedbackResult.status).json({ error: feedbackResult.error });
+    }
+
+    return res.status(201).json({ feedback: feedbackResult.feedback });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.use(authenticate, requireRole('RECRUITER'));
 
 router.post('/:id/advance', async (req, res, next) => {
   return sendTransitionResponse(req, res, next, buildApplicationAdvanceData);
