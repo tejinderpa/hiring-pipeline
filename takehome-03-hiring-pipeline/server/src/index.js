@@ -5,6 +5,7 @@ import express from 'express';
 import applicationsRouter from './applications.js';
 import authRouter from './auth.js';
 import demoRouter from './demo.js';
+import interviewerRouter from './interviewer.js';
 import jobsRouter from './jobs.js';
 
 const app = express();
@@ -20,6 +21,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/interviewer', interviewerRouter);
 app.use('/api/jobs', jobsRouter);
 
 app.use((error, req, res, next) => {

@@ -10,6 +10,7 @@ import { prisma } from './prisma.js';
 
 const router = Router();
 const applicationEditableFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
+const applicationInterviewerCreateFields = new Set(['interviewerId']);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const applicationTransactionOptions = {
   maxWait: 10000,
@@ -36,6 +37,24 @@ function hasUnknownFields(body, allowedFields) {
 
 function buildApplicationResponse(application) {
   return { application };
+}
+
+function buildApplicationInterviewerResponse(applicationInterviewer) {
+  return { applicationInterviewer };
+}
+
+function buildApplicationInterviewerData(body) {
+  if (hasUnknownFields(body, applicationInterviewerCreateFields)) {
+    return { error: 'Only interviewerId is allowed' };
+  }
+
+  const interviewerId = trimString(body.interviewerId);
+
+  if (!interviewerId) {
+    return { error: 'Interviewer id is required' };
+  }
+
+  return { interviewerId };
 }
 
 function buildApplicationPatchData(body) {
@@ -189,6 +208,136 @@ router.get('/:id/history', async (req, res, next) => {
     });
 
     return res.json({ events });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:id/interviewers', async (req, res, next) => {
+  try {
+    const body = getRequestBody(req);
+
+    if (!body) {
+      return res.status(400).json({ error: 'Request body must be an object' });
+    }
+
+    const result = buildApplicationInterviewerData(body);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const existingApplication = await findApplication(req.params.id);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const interviewer = await prisma.user.findUnique({
+      where: { id: result.interviewerId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!interviewer) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (interviewer.role !== 'INTERVIEWER') {
+      return res.status(400).json({ error: 'User must have INTERVIEWER role' });
+    }
+
+    const existingAssignment = await prisma.applicationInterviewer.findUnique({
+      where: {
+        applicationId_interviewerId: {
+          applicationId: req.params.id,
+          interviewerId: result.interviewerId,
+        },
+      },
+    });
+
+    if (existingAssignment) {
+      return res.status(409).json({ error: 'Interviewer is already assigned to this application' });
+    }
+
+    const applicationInterviewer = await prisma.applicationInterviewer.create({
+      data: {
+        applicationId: req.params.id,
+        interviewerId: result.interviewerId,
+      },
+      include: {
+        interviewer: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return res.status(201).json(buildApplicationInterviewerResponse(applicationInterviewer));
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Interviewer is already assigned to this application' });
+    }
+
+    return next(error);
+  }
+});
+
+router.delete('/:id/interviewers/:userId', async (req, res, next) => {
+  try {
+    const existingApplication = await findApplication(req.params.id);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const existingAssignment = await prisma.applicationInterviewer.findUnique({
+      where: {
+        applicationId_interviewerId: {
+          applicationId: req.params.id,
+          interviewerId: req.params.userId,
+        },
+      },
+      include: {
+        interviewer: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!existingAssignment) {
+      return res.status(404).json({ error: 'Application interviewer assignment not found' });
+    }
+
+    const applicationInterviewer = await prisma.applicationInterviewer.delete({
+      where: {
+        applicationId_interviewerId: {
+          applicationId: req.params.id,
+          interviewerId: req.params.userId,
+        },
+      },
+      include: {
+        interviewer: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return res.json(buildApplicationInterviewerResponse(applicationInterviewer));
   } catch (error) {
     return next(error);
   }
