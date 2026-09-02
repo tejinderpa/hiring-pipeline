@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 
+import CandidatesPage from './pages/CandidatesPage.jsx';
 import JobDetailPage from './pages/JobDetailPage.jsx';
 import JobOpeningsPage from './pages/JobOpeningsPage.jsx';
 
@@ -11,7 +12,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const navigationItems = [
   { label: 'Dashboard', icon: DashboardIcon, path: '/' },
   { label: 'Job Openings', icon: BriefcaseIcon, path: '/jobs', roles: ['RECRUITER'] },
-  { label: 'Candidates', icon: UsersIcon, path: '/candidates' },
+  { label: 'Candidates', icon: UsersIcon, path: '/candidates', roles: ['RECRUITER'] },
   { label: 'Alerts', icon: BellIcon, path: '/alerts' },
 ];
 
@@ -393,9 +394,9 @@ function PlaceholderPage({ icon: Icon, title }) {
   );
 }
 
-function RecruiterOnlyRoute({ user, children }) {
+function RecruiterOnlyRoute({ icon = BriefcaseIcon, title = 'You do not have access to job openings.', user, children }) {
   if (user.role !== 'RECRUITER') {
-    return <PlaceholderPage icon={BriefcaseIcon} title="You do not have access to job openings." />;
+    return <PlaceholderPage icon={icon} title={title} />;
   }
 
   return children;
@@ -556,7 +557,11 @@ function App() {
           path="jobs/:id"
         />
         <Route
-          element={<PlaceholderPage icon={UsersIcon} title="Candidates are not part of today's scope." />}
+          element={(
+            <RecruiterOnlyRoute icon={UsersIcon} title="You do not have access to candidates." user={user}>
+              <CandidatesPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+            </RecruiterOnlyRoute>
+          )}
           path="candidates"
         />
         <Route
