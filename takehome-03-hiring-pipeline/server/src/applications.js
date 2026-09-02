@@ -1,6 +1,11 @@
 import { Router } from 'express';
 
 import {
+  buildBulkApplicationActionResponse,
+  buildBulkApplicationIds,
+  bulkUpdateApplicationsWithEvents,
+} from './applicationBulkActions.js';
+import {
   buildApplicationAdvanceData,
   buildFeedbackAddedEventData,
   buildApplicationReinstateData,
@@ -158,6 +163,8 @@ async function updateApplicationWithEvent(applicationId, actorId, buildTransitio
         return { status: 409, error: transition.error };
       }
 
+      const from = existingApplication.stage;
+      const to = transition.eventData.newStage;
       const application = await tx.application.update({
         where: { id: applicationId },
         data: transition.applicationData,
@@ -167,7 +174,7 @@ async function updateApplicationWithEvent(applicationId, actorId, buildTransitio
         data: transition.eventData,
       });
 
-      return { application };
+      return { application, from, to };
     },
     applicationTransactionOptions,
   );
@@ -256,6 +263,62 @@ router.post('/:id/feedback', authenticate, requireRole('INTERVIEWER'), async (re
 });
 
 router.use(authenticate, requireRole('RECRUITER'));
+
+router.post('/bulk/advance', async (req, res, next) => {
+  try {
+    const body = getRequestBody(req);
+
+    if (!body) {
+      return res.status(400).json({ error: 'Request body must be an object' });
+    }
+
+    const result = buildBulkApplicationIds(body);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const results = await bulkUpdateApplicationsWithEvents({
+      prisma,
+      applicationIds: result.applicationIds,
+      actorId: req.auth.userId,
+      buildTransition: buildApplicationAdvanceData,
+      updateApplicationWithEvent,
+    });
+
+    return res.json(buildBulkApplicationActionResponse(results));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/bulk/reject', async (req, res, next) => {
+  try {
+    const body = getRequestBody(req);
+
+    if (!body) {
+      return res.status(400).json({ error: 'Request body must be an object' });
+    }
+
+    const result = buildBulkApplicationIds(body);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const results = await bulkUpdateApplicationsWithEvents({
+      prisma,
+      applicationIds: result.applicationIds,
+      actorId: req.auth.userId,
+      buildTransition: buildApplicationRejectData,
+      updateApplicationWithEvent,
+    });
+
+    return res.json(buildBulkApplicationActionResponse(results));
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.get('/', async (req, res, next) => {
   try {
