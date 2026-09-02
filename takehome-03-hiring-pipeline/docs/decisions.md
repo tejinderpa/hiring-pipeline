@@ -161,3 +161,69 @@ Prisma's implicit many-to-many relationship between `Application` and `User`.
 
 Why:
 The assignment needs `assignedAt` as relationship metadata, and the explicit model gives clear database constraints plus straightforward authorization queries for "is this interviewer assigned to this application?"
+
+## Decision 13 - Server-side candidate listing
+
+Chose:
+Use `GET /api/applications` with Prisma `where`, `orderBy`, `skip`, `take`, and a matching filtered `count`.
+
+Rejected:
+Fetching all applications into React and using client-side filtering, sorting, or slicing.
+
+Why:
+Requirement 6 explicitly requires the database to perform search, filtering, sorting, pagination, and total counts. Server-side querying also preserves authorization boundaries because interviewers never receive recruiter-wide application data.
+
+## Decision 14 - Allowlisted sort fields
+
+Chose:
+Accept only `appliedAt`, `stage`, and `updatedAt`, and only `asc` or `desc`.
+
+Rejected:
+Passing arbitrary query parameter values directly into Prisma `orderBy`.
+
+Why:
+The UI needs only three sort choices, and an allowlist prevents users from driving unexpected Prisma query shapes.
+
+## Decision 15 - Per-application bulk transactions
+
+Chose:
+For bulk advance/reject, fetch requested applications once, then process each candidate through the same per-application transaction helper used by single actions.
+
+Rejected:
+One all-or-nothing transaction for the whole batch.
+
+Why:
+Requirement 7 requires partial success. A valid candidate should remain advanced or rejected even if another selected candidate is missing, already hired, or already rejected. The per-application transaction still keeps each successful application state change and timeline event atomic.
+
+## Decision 16 - Current-page bulk selection
+
+Chose:
+The candidate page's select-all checkbox selects only the currently loaded server page.
+
+Rejected:
+Implicitly selecting every candidate matching the current search across all pages.
+
+Why:
+Current-page selection is safer and easier to explain. It also matches the frontend data model: the browser only knows the current page returned by `GET /api/applications`.
+
+## Decision 17 - Authenticated Blob CSV download
+
+Chose:
+Download CSV with authenticated `fetch`, convert the response to a Blob, create an object URL, and trigger a temporary download link.
+
+Rejected:
+A plain anchor tag to `/api/applications/export`.
+
+Why:
+Authentication uses bearer tokens in the `Authorization` header. A plain anchor would not include that header, so it would fail or encourage weakening the backend auth model.
+
+## Decision 18 - Full active-pipeline CSV export
+
+Chose:
+Export non-rejected applications attached to non-archived `OPEN` job openings.
+
+Rejected:
+Exporting only the current UI page or adding a new application status field.
+
+Why:
+The assignment asks for a pipeline snapshot, not a paginated page export. The existing schema already has job `status`, job `archivedAt`, and application `stage`, which are enough to define the active pipeline for this implementation.

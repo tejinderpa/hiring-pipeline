@@ -546,3 +546,75 @@ Implemented `POST /api/applications/:id/interviewers`, `DELETE /api/applications
 Asked to implement `POST /api/applications/:id/feedback`, require an assigned interviewer, derive `interviewerId` from the authenticated user, create `Feedback`, and append a `FEEDBACK_ADDED` timeline event.
 
 Implemented the feedback route using the existing auth middleware, `ApplicationInterviewer` assignment lookup, `Feedback` table, and `ApplicationEvent` timeline. Kept feedback immutable by adding no edit or delete routes.
+
+# 2 September : Requirements 6 and 7
+
+## Server-side candidate search and pagination
+
+### Prompt
+
+Asked Codex to implement only the backend `GET /api/applications` endpoint for recruiters. The endpoint needed server-side text search over candidate name/email, optional `jobId`, `stage`, and `source` filters, allowlisted sorting by `appliedAt`, `stage`, or `updatedAt`, positive bounded pagination, filtered totals, recruiter-only authorization, and no frontend changes.
+
+### What Codex produced
+
+Codex inspected the Prisma schema, existing application routes, auth middleware, interviewer route, job routes, and frontend list pages. It added `server/src/applicationListQuery.js`, wired `GET /api/applications` into `server/src/applications.js`, and added Node tests for query building and pagination metadata.
+
+### What you corrected
+
+No behavior correction was needed for the endpoint. The test command initially failed in PowerShell because `npm.ps1` was blocked by the local execution policy, so verification switched to `npm.cmd test`.
+
+## Frontend recruiter candidate search page
+
+### Prompt
+
+Asked Codex to implement the recruiter-facing candidate list for Requirement 6, using `GET /api/applications` and relying on the server for search, filters, sorting, and pagination. The page needed search, job/stage/source filters, sort controls, pagination controls, URL query state where practical, loading/empty/error states, and recruiter-only access.
+
+### What Codex produced
+
+Codex added `client/src/pages/CandidatesPage.jsx` and connected `/candidates` in `client/src/App.jsx`. The page stores only the current returned API page, syncs query controls through `useSearchParams`, debounces text search/source input, and renders pagination metadata from the server.
+
+### What you corrected
+
+The initial source filter input updated the URL immediately on every keystroke. Codex corrected it to use the same debounce pattern as the search box. Codex also adjusted the recruiter-only route placeholder so an interviewer manually visiting `/candidates` sees a candidate-specific access message instead of a job-openings message.
+
+## Backend bulk actions
+
+### Prompt
+
+Asked Codex to implement the backend portion of Requirement 7: `POST /api/applications/bulk/advance` and `POST /api/applications/bulk/reject`, recruiter-only, request-level validation for `applicationIds`, duplicate ID handling, independent per-candidate success/failure results, and reuse of the single-candidate transition rules and timeline behavior.
+
+### What Codex produced
+
+Codex added `server/src/applicationBulkActions.js`, added bulk routes to `server/src/applications.js`, and added tests for validation, duplicate deduplication, every forward transition, hired/rejected failures, nonexistent IDs, already rejected behavior, and partial-success semantics.
+
+### What you corrected
+
+After extracting the bulk helper into `applicationBulkActions.js`, a duplicate local helper remained in `applications.js`. Codex caught it during the diff scan and removed the duplicate so the router uses the tested helper implementation.
+
+## CSV export and frontend bulk actions
+
+### Prompt
+
+Asked Codex to finish Requirement 7 with recruiter frontend bulk selection/actions, `GET /api/applications/export`, and authenticated CSV download. The export needed to be recruiter-only, represent the open pipeline snapshot rather than the current page, include current stage, escape commas/quotes/line breaks, and avoid using a plain anchor because authentication uses bearer tokens.
+
+### What Codex produced
+
+Codex added `server/src/applicationExport.js`, `server/src/applicationExport.test.js`, and `GET /api/applications/export`. It updated `client/src/pages/CandidatesPage.jsx` with current-page selection, select-all-current-page, clear selection, advance/reject selected, partial-success summaries with backend reasons, reject confirmation, in-flight duplicate-submit guards, and authenticated Blob CSV download.
+
+### What you corrected
+
+During verification, Codex noticed that browser `fetch` could not reliably read the server's `Content-Disposition` filename across origins unless CORS exposed that response header. It updated `server/src/index.js` to expose `Content-Disposition` and re-verified the export headers.
+
+## Requirement 6/7 audit and documentation
+
+### Prompt
+
+Asked Codex to audit Requirements 6 and 7 for server-side querying, RBAC, performance issues, bulk partial success, timeline consistency, CSV correctness, and to update the repository documentation with the decisions actually made during this phase.
+
+### What Codex produced
+
+Codex reviewed the implementation, found no feature defects, and updated `docs/architecture.md`, `docs/schema.md`, `docs/plan.md`, `docs/decisions.md`, and this prompt log.
+
+### What you corrected
+
+No additional implementation correction was made during this audit pass before documentation updates.

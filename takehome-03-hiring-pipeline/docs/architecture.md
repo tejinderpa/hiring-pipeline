@@ -8,7 +8,7 @@ The React client handles the authenticated user interface. It stores the JWT ret
 
 The Express server owns authentication, role authorization, request validation, pipeline rules, and database writes. Client-side UI restrictions are useful for experience, but the server is the enforcement layer.
 
-Prisma is the data access layer between Express and PostgreSQL. The current domain tables are `User`, `JobOpening`, `Application`, and `ApplicationEvent`.
+Prisma is the data access layer between Express and PostgreSQL. The current domain tables are `User`, `JobOpening`, `Application`, `ApplicationInterviewer`, `Feedback`, and `ApplicationEvent`.
 
 ## Backend Shape
 
@@ -26,6 +26,10 @@ request
 
 Pipeline decisions live in `server/src/applicationPipeline.js`. That module owns the legal next-stage map, rejection behavior, reinstatement behavior, and event payload construction. The route handlers call it rather than scattering transition conditionals across controllers.
 
+Candidate search/list query parsing lives in `server/src/applicationListQuery.js`. The recruiter-wide candidate list builds a Prisma `where`, `orderBy`, `skip`, and `take` from allowlisted query parameters, then fetches the page and matching count together. The React candidate page only stores the current page returned by `GET /api/applications`; search, filtering, sorting, and pagination are not reimplemented in the browser.
+
+Bulk application request validation and result shaping live in `server/src/applicationBulkActions.js`. Bulk advance/reject routes reuse the same single-application transition builders as the individual endpoints, so the batch actions cannot skip stages or drift from the normal pipeline state machine.
+
 ## Pipeline Writes And History
 
 Application creation and pipeline actions append `ApplicationEvent` rows. The application mutation and event insertion happen inside a Prisma transaction so the system does not successfully change application state and then fail to write the corresponding history event.
@@ -36,8 +40,24 @@ Current transactional operations:
 - `POST /api/applications/:id/advance`
 - `POST /api/applications/:id/reject`
 - `POST /api/applications/:id/reinstate`
+- successful per-application mutations inside `POST /api/applications/bulk/advance`
+- successful per-application mutations inside `POST /api/applications/bulk/reject`
 
 The transaction wait budget is configured on these application-history transactions because testing against the hosted Supabase database exposed occasional transaction start timeouts under repeated API verification.
+
+Bulk actions deliberately do not wrap the whole batch in one transaction. Each candidate is evaluated independently, and each successful candidate uses the same per-application transaction as the single action. This preserves partial success: one invalid or missing application does not roll back valid candidates already processed.
+
+## Candidate List And Export
+
+Recruiters use `GET /api/applications` for the global candidate list. Supported query parameters are `search`, `jobId`, `stage`, `source`, `sort`, `order`, `page`, and `limit`. Sort fields and directions are allowlisted before being passed to Prisma.
+
+Recruiters use `GET /api/applications/export` to download a CSV snapshot of the active pipeline. In this codebase, "open pipeline" means applications that:
+
+- are not in `REJECTED`
+- belong to a job opening with `status = OPEN`
+- belong to a job opening where `archivedAt` is `null`
+
+The export is intentionally not limited to the current UI page. It is protected by the same recruiter-only application router middleware. The client downloads it with authenticated `fetch`, reads the response as a Blob, and uses the `Content-Disposition` filename exposed through CORS.
 
 ## Representative Request Path
 
@@ -67,4 +87,4 @@ The request body is not allowed to choose the destination stage. A generic `PATC
 
 ## Deliberately Not Built Yet
 
-The backend does not yet include interviewer assignment, feedback submission, dashboard analytics, alerts, bulk operations, CSV export, or frontend timeline controls. `FEEDBACK_ADDED` exists in the event enum so the history model can support feedback later, but no feedback API was added for this step.
+The application does not yet include dashboard analytics, stalled-application alerts, frontend timeline controls, or filtering the CSV export by the current candidate-list query. Bulk selection/export are implemented only on the recruiter candidate list; there is no interviewer bulk UI.

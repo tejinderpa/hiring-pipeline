@@ -132,6 +132,8 @@ Indexes:
 - `ApplicationEvent.applicationId, createdAt` for chronological application timelines.
 - `ApplicationEvent.actorId` for future actor-based audit queries.
 
+No schema change was required for Requirements 6 and 7. Candidate search, filtering, sorting, pagination, bulk actions, and CSV export reuse the existing `Application`, `JobOpening`, and `ApplicationEvent` tables.
+
 ## Database vs Application Constraints
 
 Database-level constraints:
@@ -151,6 +153,9 @@ Application-level constraints:
 - Enforcing the legal pipeline transitions.
 - Preserving `rejectedFromStage` on rejection and clearing it on reinstatement.
 - Appending history events in the same transaction as application creation or stage mutation.
+- Validating candidate-list query parameters, including pagination bounds and allowlisted sort fields.
+- Deduplicating bulk action IDs while returning one result per unique requested application.
+- Defining the CSV "open pipeline" export as non-rejected applications attached to non-archived `OPEN` job openings.
 
 These pipeline rules stay in application code because they are workflow rules, not just data-shape rules. PostgreSQL can restrict values to enum members, but it should not own product-specific transition behavior like refusing `REJECTED -> SCREENING` unless a reinstatement action is used.
 
@@ -160,6 +165,10 @@ These pipeline rules stay in application code because they are workflow rules, n
 
 `rejectedFromStage` is also deliberate. It is small duplication of historical state, but it makes reinstatement deterministic and avoids guessing from the event log during the write path.
 
-## Scaling Limitations
+## Query Patterns And Scaling Limitations
 
-The current indexes support the main expected reads, but list endpoints do not yet implement pagination or search. At 100x data, the first pressure points would likely be job detail pages that load every application for a job and history pages that load every event for an application. Those should eventually add pagination, filtering, and possibly additional indexes based on the real query patterns.
+`GET /api/applications` now applies search, filters, sorting, offset pagination, and filtered counts in Prisma rather than loading all applications into memory. The current `Application.jobOpeningId` index helps job filtering. At 100x data, candidate search over `candidateName` and `candidateEmail`, source filtering, stage sorting/filtering, and updated-date ordering may need additional database indexes or a Postgres text-search strategy based on real usage.
+
+The CSV export intentionally reads the full active pipeline because the assignment asks for a snapshot, not one UI page. At much larger scale this may need streaming CSV output instead of building the whole file in memory.
+
+Job detail pages still load every application for one job, and history pages load every event for one application. Those reads should eventually add pagination if individual jobs or timelines become large.

@@ -76,3 +76,53 @@ foundation:
 The only role-specific backend routes added so far are temporary verification endpoints.
 They exist to confirm server-side authorization and should be replaced later by real
 business routes.
+
+## Session 2 - September 1
+
+### Planned
+
+- Add interviewer assignment and feedback support.
+- Keep interviewer access scoped by the authenticated user.
+- Record feedback in immutable application history.
+
+### Actual
+
+Implemented the explicit interviewer assignment join model, feedback model, recruiter assignment/removal endpoints, interviewer-scoped application list, and feedback submission with `FEEDBACK_ADDED` events.
+
+### Deferred / cut
+
+No frontend interviewer panel was built in this session.
+
+## Session 3 - September 2
+
+### Planned
+
+- Implement Requirement 6 candidate search/listing.
+- Keep search, filtering, sorting, pagination, and total counts on the server.
+- Add the recruiter-facing candidate list without changing interviewer visibility.
+
+### Actual
+
+Added `GET /api/applications` for recruiters with Prisma `where`, allowlisted `orderBy`, `skip`, `take`, and a matching filtered `count`. Added a recruiter candidate page at `/candidates` that stores only the current API page and syncs query state into the URL.
+
+### Deferred / cut
+
+Bulk actions and CSV export were deliberately left for Requirement 7.
+
+## Session 4 - September 2
+
+### Planned
+
+- Implement Requirement 7 bulk advance/reject.
+- Add recruiter UI selection and actions.
+- Add CSV export for the active pipeline.
+
+### Actual
+
+Added recruiter-only bulk advance/reject endpoints with partial-success results. Bulk actions reuse the same transition builders as single actions and keep each successful application mutation plus history event atomic in a per-application transaction. The candidate page now supports current-page selection, bulk action summaries with failure reasons, and authenticated CSV Blob download.
+
+Added `GET /api/applications/export` for a CSV snapshot of non-rejected applications attached to non-archived `OPEN` job openings. The export is not limited to the current UI page.
+
+### Deferred / cut
+
+Did not implement cross-page selection, CSV filtering by current search criteria, dashboard analytics, or stalled-application alerts.
