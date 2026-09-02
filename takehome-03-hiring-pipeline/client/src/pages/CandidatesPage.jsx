@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 const stages = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'];
 const sortOptions = [
   { label: 'Last Updated', value: 'updatedAt' },
@@ -70,6 +71,16 @@ function buildApplicationsQuery(params) {
   return apiParams.toString();
 }
 
+function getBulkActionLabel(action) {
+  return action === 'advance' ? 'advanced' : 'rejected';
+}
+
+function getDownloadFilename(contentDisposition) {
+  const match = contentDisposition?.match(/filename="([^"]+)"/);
+
+  return match?.[1] || 'hiring-pipeline.csv';
+}
+
 function CandidatesPage({ requestJson, token }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState([]);
@@ -82,10 +93,17 @@ function CandidatesPage({ requestJson, token }) {
   });
   const [searchInput, setSearchInput] = useState(getSearchParam(searchParams, 'search'));
   const [sourceInput, setSourceInput] = useState(getSearchParam(searchParams, 'source'));
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkResult, setBulkResult] = useState(null);
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const [error, setError] = useState('');
   const [jobsError, setJobsError] = useState('');
+  const [exportError, setExportError] = useState('');
+  const bulkRequestInFlightRef = useRef(false);
+  const exportRequestInFlightRef = useRef(false);
 
   const authHeaders = useMemo(() => ({
     Authorization: `Bearer ${token}`,
@@ -112,6 +130,18 @@ function CandidatesPage({ requestJson, token }) {
     ? 0
     : ((pagination.page - 1) * pagination.limit) + 1;
   const showingEnd = Math.min(pagination.page * pagination.limit, pagination.total);
+  const selectedCount = selectedIds.size;
+  const allCurrentPageSelected = applications.length > 0
+    && applications.every((application) => selectedIds.has(application.id));
+  const applicationNamesById = useMemo(() => {
+    const namesById = new Map();
+
+    applications.forEach((application) => {
+      namesById.set(application.id, application.candidateName);
+    });
+
+    return namesById;
+  }, [applications]);
 
   useEffect(() => {
     setSearchInput(queryState.search);
@@ -120,6 +150,11 @@ function CandidatesPage({ requestJson, token }) {
   useEffect(() => {
     setSourceInput(queryState.source);
   }, [queryState.source]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkResult(null);
+  }, [queryState]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -255,6 +290,21 @@ function CandidatesPage({ requestJson, token }) {
     };
   }, [authHeaders, queryState, requestJson]);
 
+  async function refreshApplications() {
+    const query = buildApplicationsQuery(queryState);
+    const data = await requestJson(`/api/applications?${query}`, {
+      headers: authHeaders,
+    });
+
+    setApplications(data.data || []);
+    setPagination(data.pagination || {
+      page: queryState.page,
+      limit,
+      total: 0,
+      pages: 0,
+    });
+  }
+
   function updateQuery(updates) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -312,6 +362,131 @@ function CandidatesPage({ requestJson, token }) {
     updateQuery({ page: String(page) });
   }
 
+  function toggleApplicationSelection(applicationId) {
+    setBulkResult(null);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(applicationId)) {
+        next.delete(applicationId);
+      } else {
+        next.add(applicationId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleCurrentPageSelection() {
+    setBulkResult(null);
+    setSelectedIds((current) => {
+      if (applications.length === 0) {
+        return current;
+      }
+
+      if (allCurrentPageSelected) {
+        return new Set();
+      }
+
+      return new Set(applications.map((application) => application.id));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function runBulkAction(action) {
+    if (bulkRequestInFlightRef.current || selectedIds.size === 0) {
+      return;
+    }
+
+    if (action === 'reject' && !window.confirm('Reject selected applications?')) {
+      return;
+    }
+
+    bulkRequestInFlightRef.current = true;
+    setIsBulkSubmitting(true);
+    setError('');
+    setBulkResult(null);
+
+    try {
+      const applicationIds = Array.from(selectedIds);
+      const data = await requestJson(`/api/applications/bulk/${action}`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ applicationIds }),
+      });
+      const failures = [];
+      let succeeded = 0;
+
+      data.results.forEach((result) => {
+        if (result.success) {
+          succeeded += 1;
+        } else {
+          failures.push({
+            applicationId: result.applicationId,
+            name: applicationNamesById.get(result.applicationId) || result.applicationId,
+            reason: result.reason,
+          });
+        }
+      });
+
+      await refreshApplications();
+      setSelectedIds(new Set());
+      setBulkResult({
+        action,
+        succeeded,
+        failed: failures.length,
+        failures,
+      });
+    } catch (requestError) {
+      setError(requestError.message || `Unable to ${action} selected applications.`);
+    } finally {
+      bulkRequestInFlightRef.current = false;
+      setIsBulkSubmitting(false);
+    }
+  }
+
+  async function handleExportCsv() {
+    if (exportRequestInFlightRef.current) {
+      return;
+    }
+
+    exportRequestInFlightRef.current = true;
+    setIsExporting(true);
+    setExportError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/applications/export`, {
+        headers: authHeaders,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Unable to export candidates.');
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = objectUrl;
+      link.download = getDownloadFilename(response.headers.get('Content-Disposition'));
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (requestError) {
+      setExportError(requestError.message || 'Unable to export candidates.');
+    } finally {
+      exportRequestInFlightRef.current = false;
+      setIsExporting(false);
+    }
+  }
+
+  const bulkActionLabel = bulkResult ? getBulkActionLabel(bulkResult.action) : '';
+
   return (
     <div className="flex flex-1 flex-col px-5 py-6 lg:px-8">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -322,9 +497,19 @@ function CandidatesPage({ requestJson, token }) {
             Search candidates across all job openings.
           </p>
         </div>
-        <p className="text-sm text-slate-500">
-          Showing {showingStart}-{showingEnd} of {pagination.total}
-        </p>
+        <div className="flex flex-col gap-3 sm:items-end">
+          <button
+            className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            disabled={isExporting}
+            onClick={handleExportCsv}
+            type="button"
+          >
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <p className="text-sm text-slate-500">
+            Showing {showingStart}-{showingEnd} of {pagination.total}
+          </p>
+        </div>
       </div>
 
       <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -426,9 +611,70 @@ function CandidatesPage({ requestJson, token }) {
         ) : null}
       </div>
 
+      {exportError ? (
+        <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {exportError}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      ) : null}
+
+      {selectedCount > 0 ? (
+        <div className="mt-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-slate-700">
+            {selectedCount} {selectedCount === 1 ? 'candidate' : 'candidates'} selected on this page.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              disabled={isBulkSubmitting}
+              onClick={clearSelection}
+              type="button"
+            >
+              Clear Selection
+            </button>
+            <button
+              className="h-10 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={isBulkSubmitting}
+              onClick={() => runBulkAction('advance')}
+              type="button"
+            >
+              {isBulkSubmitting ? 'Working...' : 'Advance Selected'}
+            </button>
+            <button
+              className="h-10 rounded-md bg-red-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={isBulkSubmitting}
+              onClick={() => runBulkAction('reject')}
+              type="button"
+            >
+              {isBulkSubmitting ? 'Working...' : 'Reject Selected'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkResult ? (
+        <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-slate-950">
+            {bulkResult.succeeded} {bulkResult.succeeded === 1 ? 'application' : 'applications'} {bulkActionLabel}.
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {bulkResult.failed} {bulkResult.failed === 1 ? 'application' : 'applications'} could not be {bulkActionLabel}.
+          </p>
+          {bulkResult.failures.length ? (
+            <ul className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+              {bulkResult.failures.map((failure) => (
+                <li className="text-sm text-slate-700" key={failure.applicationId}>
+                  <span className="font-semibold text-slate-950">{failure.name}</span>
+                  <span className="text-slate-500"> - {failure.reason}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
@@ -440,8 +686,10 @@ function CandidatesPage({ requestJson, token }) {
                 <th className="w-12 px-4 py-3 text-left">
                   <input
                     aria-label="Select all candidates"
+                    checked={allCurrentPageSelected}
                     className="h-4 w-4 rounded border-slate-300 text-cyan-700 focus:ring-cyan-700"
-                    disabled
+                    disabled={isLoading || applications.length === 0}
+                    onChange={toggleCurrentPageSelection}
                     type="checkbox"
                   />
                 </th>
@@ -464,8 +712,10 @@ function CandidatesPage({ requestJson, token }) {
                   <td className="px-4 py-4">
                     <input
                       aria-label={`Select ${application.candidateName}`}
+                      checked={selectedIds.has(application.id)}
                       className="h-4 w-4 rounded border-slate-300 text-cyan-700 focus:ring-cyan-700"
-                      disabled
+                      disabled={isBulkSubmitting}
+                      onChange={() => toggleApplicationSelection(application.id)}
                       type="checkbox"
                     />
                   </td>

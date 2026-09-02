@@ -6,6 +6,11 @@ import {
   bulkUpdateApplicationsWithEvents,
 } from './applicationBulkActions.js';
 import {
+  buildApplicationExportCsv,
+  buildApplicationExportFilename,
+  openPipelineApplicationWhere,
+} from './applicationExport.js';
+import {
   buildApplicationAdvanceData,
   buildFeedbackAddedEventData,
   buildApplicationReinstateData,
@@ -364,6 +369,43 @@ router.get('/', async (req, res, next) => {
       query.limit,
       total,
     ));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/export', async (req, res, next) => {
+  try {
+    const applications = await prisma.application.findMany({
+      where: openPipelineApplicationWhere,
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'asc' },
+      ],
+      select: {
+        id: true,
+        candidateName: true,
+        candidateEmail: true,
+        source: true,
+        stage: true,
+        appliedAt: true,
+        updatedAt: true,
+        jobOpening: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
+    const csv = buildApplicationExportCsv(applications);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${buildApplicationExportFilename()}"`,
+    );
+
+    return res.send(csv);
   } catch (error) {
     return next(error);
   }
