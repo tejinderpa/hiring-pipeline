@@ -6,6 +6,10 @@ import {
   buildApplicationReinstateData,
   buildApplicationRejectData,
 } from './applicationPipeline.js';
+import {
+  buildApplicationListQuery,
+  buildApplicationListResponse,
+} from './applicationListQuery.js';
 import { authenticate, requireRole } from './auth.js';
 import { prisma } from './prisma.js';
 
@@ -252,6 +256,55 @@ router.post('/:id/feedback', authenticate, requireRole('INTERVIEWER'), async (re
 });
 
 router.use(authenticate, requireRole('RECRUITER'));
+
+router.get('/', async (req, res, next) => {
+  try {
+    const query = buildApplicationListQuery(req.query);
+
+    if (query.error) {
+      return res.status(400).json({ error: query.error });
+    }
+
+    const select = {
+      id: true,
+      candidateName: true,
+      candidateEmail: true,
+      source: true,
+      stage: true,
+      appliedAt: true,
+      updatedAt: true,
+      jobOpeningId: true,
+      jobOpening: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    };
+
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where: query.where,
+        orderBy: query.orderBy,
+        skip: query.skip,
+        take: query.take,
+        select,
+      }),
+      prisma.application.count({
+        where: query.where,
+      }),
+    ]);
+
+    return res.json(buildApplicationListResponse(
+      applications,
+      query.page,
+      query.limit,
+      total,
+    ));
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.post('/:id/advance', async (req, res, next) => {
   return sendTransitionResponse(req, res, next, buildApplicationAdvanceData);
