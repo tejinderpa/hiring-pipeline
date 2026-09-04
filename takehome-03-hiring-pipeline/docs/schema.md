@@ -48,12 +48,15 @@ Relationships:
 | `stage` | `ApplicationStage` enum | Current pipeline stage; defaults to `APPLIED` |
 | `rejectedFromStage` | `ApplicationStage`? | Stores the exact stage a rejected candidate came from |
 | `appliedAt` | DateTime | Set when the application is created |
+| `stageEnteredAt` | DateTime | The time the application entered its current stage |
+| `interviewScheduledAt` | DateTime? | Optional scheduled interview date used by dashboard metrics |
 | `updatedAt` | DateTime | Updated automatically by Prisma |
 
 Relationships:
 
 - Each `Application` belongs to exactly one `JobOpening`.
 - One `Application` has many `ApplicationEvent` rows.
+- One `Application` can have many `AlertDismissal` rows, one per dismissed stage.
 - One `Application` can have many interviewer assignments through `ApplicationInterviewer`.
 - One `Application` can have many `Feedback` rows.
 
@@ -64,6 +67,25 @@ APPLIED -> SCREENING -> INTERVIEW -> OFFER -> HIRED
 ```
 
 `REJECTED` is outside that forward path. `rejectedFromStage` is deliberately stored so reinstatement is deterministic: a candidate rejected from `INTERVIEW` returns to `INTERVIEW`, not an assumed default like `APPLIED`.
+
+`stageEnteredAt` is deliberately separate from `updatedAt`. It changes only when the current pipeline stage changes, including advance, reject, and reinstate actions. Candidate detail edits, interviewer assignment, and feedback do not reset it.
+
+## AlertDismissal
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | String / UUID | Primary key |
+| `applicationId` | String | Foreign key to `Application` |
+| `stage` | `ApplicationStage` enum | The application stage whose stalled alert was dismissed |
+| `dismissedBy` | String | Foreign key to the recruiter `User` who dismissed it |
+| `dismissedAt` | DateTime | Set when the alert is dismissed |
+
+Relationships:
+
+- Each `AlertDismissal` belongs to exactly one `Application`.
+- Each `AlertDismissal` belongs to one recruiter `User`.
+
+The unique constraint on `applicationId, stage` makes dismissal scoped to the stage. A dismissed `SCREENING` alert does not suppress a later `INTERVIEW` alert for the same application.
 
 ## ApplicationInterviewer
 
@@ -140,6 +162,7 @@ Database-level constraints:
 
 - Primary keys, foreign keys, enum values, and required fields.
 - `User.email` uniqueness.
+- `AlertDismissal.applicationId, stage` uniqueness.
 - Referential integrity between jobs, applications, interviewer assignments, feedback, events, and users.
 - Duplicate interviewer assignments are prevented by the `ApplicationInterviewer` composite primary key.
 
@@ -151,7 +174,9 @@ Application-level constraints:
 - Validating request body fields and email format.
 - Preventing direct `stage` changes through generic application PATCH.
 - Enforcing the legal pipeline transitions.
+- Updating `Application.stageEnteredAt` only through pipeline transitions.
 - Preserving `rejectedFromStage` on rejection and clearing it on reinstatement.
+- Computing stalled alerts from current application state and stage-scoped dismissals.
 - Appending history events in the same transaction as application creation or stage mutation.
 - Validating candidate-list query parameters, including pagination bounds and allowlisted sort fields.
 - Deduplicating bulk action IDs while returning one result per unique requested application.

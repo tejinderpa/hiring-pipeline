@@ -8,7 +8,7 @@ The React client handles the authenticated user interface. It stores the JWT ret
 
 The Express server owns authentication, role authorization, request validation, pipeline rules, and database writes. Client-side UI restrictions are useful for experience, but the server is the enforcement layer.
 
-Prisma is the data access layer between Express and PostgreSQL. The current domain tables are `User`, `JobOpening`, `Application`, `ApplicationInterviewer`, `Feedback`, and `ApplicationEvent`.
+Prisma is the data access layer between Express and PostgreSQL. The current domain tables are `User`, `JobOpening`, `Application`, `AlertDismissal`, `ApplicationInterviewer`, `Feedback`, and `ApplicationEvent`.
 
 ## Backend Shape
 
@@ -29,6 +29,10 @@ Pipeline decisions live in `server/src/applicationPipeline.js`. That module owns
 Candidate search/list query parsing lives in `server/src/applicationListQuery.js`. The recruiter-wide candidate list builds a Prisma `where`, `orderBy`, `skip`, and `take` from allowlisted query parameters, then fetches the page and matching count together. The React candidate page only stores the current page returned by `GET /api/applications`; search, filtering, sorting, and pagination are not reimplemented in the browser.
 
 Bulk application request validation and result shaping live in `server/src/applicationBulkActions.js`. Bulk advance/reject routes reuse the same single-application transition builders as the individual endpoints, so the batch actions cannot skip stages or drift from the normal pipeline state machine.
+
+Dashboard metric definitions live in `server/src/dashboardMetrics.js` and are exposed through recruiter-only `GET /api/dashboard`. Active applications are applications whose current stage is not terminal: `HIRED` and `REJECTED` are excluded. Calendar week and month boundaries are computed in UTC so the API has stable behavior regardless of the server's local timezone.
+
+Stalled application alert rules live in `server/src/stalledAlerts.js` and are exposed through recruiter-only `/api/alerts/stalled` routes. Alerts are computed from the current `Application.stageEnteredAt` value and existing `AlertDismissal` rows when requested; the app does not persist alert records or run a cron job.
 
 ## Pipeline Writes And History
 
@@ -70,6 +74,7 @@ POST /api/applications/:id/advance
 -> load the application inside a Prisma transaction
 -> applicationPipeline maps SCREENING to INTERVIEW
 -> update Application.stage to INTERVIEW
+-> update Application.stageEnteredAt to the transition time
 -> create ApplicationEvent:
    type = STAGE_CHANGED
    oldStage = SCREENING
@@ -85,6 +90,14 @@ The request body is not allowed to choose the destination stage. A generic `PATC
 
 `GET /api/applications/:id/history` returns immutable events for one application ordered oldest-to-newest. Actor information is limited to safe display fields: `id`, `email`, and `role`. Password hashes are never selected for this response.
 
+## Dashboard And Alerts
+
+`GET /api/dashboard` returns recruiter-wide counts for open positions, active applications, interviews scheduled this week, hires this month, applications by stage, applications by job, and applications received per week for the latest 13 UTC calendar weeks.
+
+`GET /api/alerts/stalled` returns non-terminal applications where `stageEnteredAt` is more than 10 days old and no dismissal exists for the application's current `(applicationId, stage)` pair.
+
+`POST /api/alerts/stalled/:applicationId/dismiss` loads the current application, verifies that it is still stalled, and upserts an `AlertDismissal` for the current stage only. The client cannot choose the dismissal stage.
+
 ## Deliberately Not Built Yet
 
-The application does not yet include dashboard analytics, stalled-application alerts, frontend timeline controls, or filtering the CSV export by the current candidate-list query. Bulk selection/export are implemented only on the recruiter candidate list; there is no interviewer bulk UI.
+The application does not yet include dashboard or alert frontend screens, frontend timeline controls, or filtering the CSV export by the current candidate-list query. Bulk selection/export are implemented only on the recruiter candidate list; there is no interviewer bulk UI.
