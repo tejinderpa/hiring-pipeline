@@ -8,7 +8,13 @@ const router = Router();
 const allowedStatuses = new Set(['OPEN', 'CLOSED']);
 const editableFields = new Set(['title', 'department', 'description', 'status']);
 const createFields = new Set(['title', 'department', 'description', 'status']);
-const applicationCreateFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
+const applicationCreateFields = new Set([
+  'candidateName',
+  'candidateEmail',
+  'source',
+  'notes',
+  'interviewScheduledAt',
+]);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const applicationTransactionOptions = {
   maxWait: 10000,
@@ -31,6 +37,24 @@ function getRequestBody(req) {
 
 function hasUnknownFields(body, allowedFields) {
   return Object.keys(body).some((field) => !allowedFields.has(field));
+}
+
+function parseOptionalDateTime(value, fieldName) {
+  if (value === null || value === '') {
+    return { value: null };
+  }
+
+  if (typeof value !== 'string') {
+    return { error: `${fieldName} must be a date string or null` };
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return { error: `${fieldName} must be a valid date` };
+  }
+
+  return { value: date };
 }
 
 function buildJobResponse(job) {
@@ -138,6 +162,9 @@ function buildApplicationCreateData(body, jobOpeningId) {
   const candidateEmail = trimString(body.candidateEmail).toLowerCase();
   const source = trimString(body.source);
   const notes = Object.hasOwn(body, 'notes') ? body.notes : null;
+  const interviewScheduledAt = Object.hasOwn(body, 'interviewScheduledAt')
+    ? body.interviewScheduledAt
+    : null;
 
   if (!candidateName) {
     return { error: 'Candidate name is required' };
@@ -159,6 +186,15 @@ function buildApplicationCreateData(body, jobOpeningId) {
     return { error: 'Notes must be a string' };
   }
 
+  const interviewScheduledAtResult = parseOptionalDateTime(
+    interviewScheduledAt,
+    'interviewScheduledAt',
+  );
+
+  if (interviewScheduledAtResult.error) {
+    return { error: interviewScheduledAtResult.error };
+  }
+
   return {
     data: {
       jobOpeningId,
@@ -166,6 +202,7 @@ function buildApplicationCreateData(body, jobOpeningId) {
       candidateEmail,
       source,
       notes: trimString(notes) || null,
+      interviewScheduledAt: interviewScheduledAtResult.value,
     },
   };
 }
@@ -262,7 +299,7 @@ router.post('/:jobId/applications', async (req, res, next) => {
     }
 
     if (hasUnknownFields(body, applicationCreateFields)) {
-      return res.status(400).json({ error: 'Only candidateName, candidateEmail, source, and notes are allowed' });
+      return res.status(400).json({ error: 'Only candidateName, candidateEmail, source, notes, and interviewScheduledAt are allowed' });
     }
 
     const existingJob = await findJob(req.params.jobId);

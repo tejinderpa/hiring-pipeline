@@ -24,7 +24,13 @@ import { authenticate, requireRole } from './auth.js';
 import { prisma } from './prisma.js';
 
 const router = Router();
-const applicationEditableFields = new Set(['candidateName', 'candidateEmail', 'source', 'notes']);
+const applicationEditableFields = new Set([
+  'candidateName',
+  'candidateEmail',
+  'source',
+  'notes',
+  'interviewScheduledAt',
+]);
 const applicationInterviewerCreateFields = new Set(['interviewerId']);
 const feedbackCreateFields = new Set(['content']);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,6 +53,24 @@ function getRequestBody(req) {
 
 function hasUnknownFields(body, allowedFields) {
   return Object.keys(body).some((field) => !allowedFields.has(field));
+}
+
+function parseOptionalDateTime(value, fieldName) {
+  if (value === null || value === '') {
+    return { value: null };
+  }
+
+  if (typeof value !== 'string') {
+    return { error: `${fieldName} must be a date string or null` };
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return { error: `${fieldName} must be a valid date` };
+  }
+
+  return { value: date };
 }
 
 function buildApplicationResponse(application) {
@@ -95,7 +119,7 @@ function buildApplicationPatchData(body) {
   }
 
   if (hasUnknownFields(body, applicationEditableFields)) {
-    return { error: 'Only candidateName, candidateEmail, source, and notes can be updated' };
+    return { error: 'Only candidateName, candidateEmail, source, notes, and interviewScheduledAt can be updated' };
   }
 
   const data = {};
@@ -140,6 +164,19 @@ function buildApplicationPatchData(body) {
     }
 
     data.notes = trimString(body.notes) || null;
+  }
+
+  if (Object.hasOwn(body, 'interviewScheduledAt')) {
+    const interviewScheduledAtResult = parseOptionalDateTime(
+      body.interviewScheduledAt,
+      'interviewScheduledAt',
+    );
+
+    if (interviewScheduledAtResult.error) {
+      return { error: interviewScheduledAtResult.error };
+    }
+
+    data.interviewScheduledAt = interviewScheduledAtResult.value;
   }
 
   return { data };
@@ -340,6 +377,8 @@ router.get('/', async (req, res, next) => {
       source: true,
       stage: true,
       appliedAt: true,
+      stageEnteredAt: true,
+      interviewScheduledAt: true,
       updatedAt: true,
       jobOpeningId: true,
       jobOpening: {
@@ -390,6 +429,8 @@ router.get('/export', async (req, res, next) => {
         stage: true,
         appliedAt: true,
         updatedAt: true,
+        stageEnteredAt: true,
+        interviewScheduledAt: true,
         jobOpening: {
           select: {
             title: true,

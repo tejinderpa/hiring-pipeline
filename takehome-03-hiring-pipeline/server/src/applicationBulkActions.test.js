@@ -238,7 +238,9 @@ test('bulk reject reports mixed success and already rejected behavior', async ()
     id: 'app-valid',
     stage: 'REJECTED',
     rejectedFromStage: 'INTERVIEW',
+    stageEnteredAt: updater.getApplication('app-valid').stageEnteredAt,
   });
+  assert.ok(updater.getApplication('app-valid').stageEnteredAt instanceof Date);
 });
 
 test('one bulk reject failure does not roll back successes', async () => {

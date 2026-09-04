@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildApplicationAdvanceData,
+  buildApplicationReinstateData,
   buildApplicationRejectData,
 } from './applicationPipeline.js';
 
@@ -17,9 +18,14 @@ function buildApplication(stage) {
 
 test('APPLIED advances to SCREENING', () => {
   const application = buildApplication('APPLIED');
+  const beforeTransition = Date.now();
   const result = buildApplicationAdvanceData(application, actorId);
+  const afterTransition = Date.now();
 
   assert.equal(result.applicationData.stage, 'SCREENING');
+  assert.ok(result.applicationData.stageEnteredAt instanceof Date);
+  assert.ok(result.applicationData.stageEnteredAt.getTime() >= beforeTransition);
+  assert.ok(result.applicationData.stageEnteredAt.getTime() <= afterTransition);
   assert.equal(result.eventData.type, 'STAGE_CHANGED');
   assert.equal(result.eventData.actorId, actorId);
   assert.equal(result.eventData.oldStage, 'APPLIED');
@@ -65,10 +71,9 @@ test('REJECTED cannot advance', () => {
 test('reject preserves the stage an application was rejected from', () => {
   const result = buildApplicationRejectData(buildApplication('INTERVIEW'), actorId);
 
-  assert.deepEqual(result.applicationData, {
-    stage: 'REJECTED',
-    rejectedFromStage: 'INTERVIEW',
-  });
+  assert.equal(result.applicationData.stage, 'REJECTED');
+  assert.equal(result.applicationData.rejectedFromStage, 'INTERVIEW');
+  assert.ok(result.applicationData.stageEnteredAt instanceof Date);
   assert.equal(result.eventData.type, 'REJECTED');
   assert.equal(result.eventData.actorId, actorId);
   assert.equal(result.eventData.oldStage, 'INTERVIEW');
@@ -79,4 +84,19 @@ test('already rejected application cannot be rejected again', () => {
   const result = buildApplicationRejectData(buildApplication('REJECTED'), actorId);
 
   assert.equal(result.error, 'Application has already been rejected');
+});
+
+test('reinstating a rejected application restores rejectedFromStage and records stage entry time', () => {
+  const application = {
+    ...buildApplication('REJECTED'),
+    rejectedFromStage: 'SCREENING',
+  };
+  const result = buildApplicationReinstateData(application, actorId);
+
+  assert.equal(result.applicationData.stage, 'SCREENING');
+  assert.equal(result.applicationData.rejectedFromStage, null);
+  assert.ok(result.applicationData.stageEnteredAt instanceof Date);
+  assert.equal(result.eventData.type, 'REINSTATED');
+  assert.equal(result.eventData.oldStage, 'REJECTED');
+  assert.equal(result.eventData.newStage, 'SCREENING');
 });

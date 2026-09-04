@@ -8,6 +8,7 @@ const emptyApplicationForm = {
   candidateEmail: '',
   source: '',
   notes: '',
+  interviewScheduledAt: '',
 };
 
 function formatDate(value) {
@@ -20,6 +21,14 @@ function formatDate(value) {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(value));
+}
+
+function formatDateInput(value) {
+  if (!value) {
+    return '';
+  }
+
+  return new Date(value).toISOString().slice(0, 10);
 }
 
 function StatusBadge({ status }) {
@@ -122,6 +131,20 @@ function ApplicationFormModal({ error, form, isSaving, mode, onChange, onClose, 
               onChange={onChange}
               placeholder="Optional context for the recruiting team."
               value={form.notes}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700" htmlFor="candidate-interview-scheduled-at">
+              Interview scheduled date
+            </label>
+            <input
+              className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-700 focus:ring-4 focus:ring-cyan-700/10"
+              id="candidate-interview-scheduled-at"
+              name="interviewScheduledAt"
+              onChange={onChange}
+              type="date"
+              value={form.interviewScheduledAt}
             />
           </div>
         </div>
@@ -262,6 +285,7 @@ function JobDetailPage({ requestJson, token }) {
       candidateEmail: application.candidateEmail,
       source: application.source,
       notes: application.notes || '',
+      interviewScheduledAt: formatDateInput(application.interviewScheduledAt),
     });
     setModalError('');
     setApplicationMode('edit');

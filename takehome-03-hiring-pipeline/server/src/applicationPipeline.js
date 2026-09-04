@@ -9,6 +9,13 @@ export function getNextApplicationStage(stage) {
   return nextStageByStage[stage] ?? null;
 }
 
+function buildStageChangeApplicationData(data) {
+  return {
+    ...data,
+    stageEnteredAt: new Date(),
+  };
+}
+
 function buildApplicationEventData(application, actorId, type, oldStage, newStage, metadata = null) {
   const eventData = {
     applicationId: application.id,
@@ -59,9 +66,9 @@ export function buildApplicationAdvanceData(application, actorId) {
   }
 
   return {
-    applicationData: {
+    applicationData: buildStageChangeApplicationData({
       stage: nextStage,
-    },
+    }),
     eventData: buildApplicationEventData(
       application,
       actorId,
@@ -80,10 +87,10 @@ export function buildApplicationRejectData(application, actorId) {
   }
 
   return {
-    applicationData: {
+    applicationData: buildStageChangeApplicationData({
       stage: 'REJECTED',
       rejectedFromStage: application.stage,
-    },
+    }),
     eventData: buildApplicationEventData(
       application,
       actorId,
@@ -108,10 +115,10 @@ export function buildApplicationReinstateData(application, actorId) {
   }
 
   return {
-    applicationData: {
+    applicationData: buildStageChangeApplicationData({
       stage: application.rejectedFromStage,
       rejectedFromStage: null,
-    },
+    }),
     eventData: buildApplicationEventData(
       application,
       actorId,

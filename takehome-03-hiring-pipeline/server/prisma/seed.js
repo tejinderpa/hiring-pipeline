@@ -52,6 +52,27 @@ const demoJobs = [
   },
 ];
 
+function daysAgo(days) {
+  const date = new Date();
+  date.setHours(10, 0, 0, 0);
+  date.setDate(date.getDate() - days);
+  return date;
+}
+
+function daysFromNow(days) {
+  const date = new Date();
+  date.setHours(14, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function startOfCurrentMonth() {
+  const date = new Date();
+  date.setHours(10, 0, 0, 0);
+  date.setDate(1);
+  return date;
+}
+
 const demoApplications = [
   {
     id: 'app-asha-mehta-frontend',
@@ -60,6 +81,10 @@ const demoApplications = [
     candidateEmail: 'asha.mehta@example.com',
     source: 'LinkedIn',
     notes: 'Strong React portfolio with dashboard experience.',
+    stage: 'SCREENING',
+    appliedAt: daysAgo(21),
+    stageEnteredAt: daysAgo(14),
+    interviewScheduledAt: null,
   },
   {
     id: 'app-daniel-cho-frontend',
@@ -68,6 +93,10 @@ const demoApplications = [
     candidateEmail: 'daniel.cho@example.com',
     source: 'Referral',
     notes: 'Previously worked on design systems.',
+    stage: 'INTERVIEW',
+    appliedAt: daysAgo(10),
+    stageEnteredAt: daysAgo(3),
+    interviewScheduledAt: daysFromNow(1),
   },
   {
     id: 'app-maya-bennett-customer-success',
@@ -76,6 +105,10 @@ const demoApplications = [
     candidateEmail: 'maya.bennett@example.com',
     source: 'Careers Page',
     notes: 'Has SaaS onboarding experience.',
+    stage: 'APPLIED',
+    appliedAt: daysAgo(2),
+    stageEnteredAt: daysAgo(2),
+    interviewScheduledAt: null,
   },
   {
     id: 'app-omar-nadeem-customer-success',
@@ -84,6 +117,10 @@ const demoApplications = [
     candidateEmail: 'omar.nadeem@example.com',
     source: 'LinkedIn',
     notes: 'Good background in technical customer support.',
+    stage: 'OFFER',
+    appliedAt: daysAgo(35),
+    stageEnteredAt: daysAgo(5),
+    interviewScheduledAt: daysAgo(4),
   },
   {
     id: 'app-priya-raman-sales',
@@ -92,6 +129,10 @@ const demoApplications = [
     candidateEmail: 'priya.raman@example.com',
     source: 'Agency',
     notes: 'Early-career sales candidate with strong communication notes.',
+    stage: 'HIRED',
+    appliedAt: daysAgo(24),
+    stageEnteredAt: startOfCurrentMonth(),
+    interviewScheduledAt: daysAgo(3),
   },
   {
     id: 'app-lucas-grant-operations',
@@ -100,6 +141,59 @@ const demoApplications = [
     candidateEmail: 'lucas.grant@example.com',
     source: 'Referral',
     notes: 'Organized coordinator profile for the closed operations opening.',
+    stage: 'REJECTED',
+    rejectedFromStage: 'SCREENING',
+    appliedAt: daysAgo(42),
+    stageEnteredAt: daysAgo(18),
+    interviewScheduledAt: null,
+  },
+  {
+    id: 'app-elena-rossi-frontend',
+    jobOpeningId: 'job-frontend-engineer',
+    candidateName: 'Elena Rossi',
+    candidateEmail: 'elena.rossi@example.com',
+    source: 'Careers Page',
+    notes: 'Frontend candidate with analytics product experience.',
+    stage: 'INTERVIEW',
+    appliedAt: daysAgo(17),
+    stageEnteredAt: daysAgo(1),
+    interviewScheduledAt: daysFromNow(2),
+  },
+  {
+    id: 'app-noah-wilson-sales',
+    jobOpeningId: 'job-sales-development-representative',
+    candidateName: 'Noah Wilson',
+    candidateEmail: 'noah.wilson@example.com',
+    source: 'LinkedIn',
+    notes: 'Outbound prospecting background.',
+    stage: 'SCREENING',
+    appliedAt: daysAgo(8),
+    stageEnteredAt: daysAgo(4),
+    interviewScheduledAt: null,
+  },
+  {
+    id: 'app-samira-khan-customer-success',
+    jobOpeningId: 'job-customer-success-manager',
+    candidateName: 'Samira Khan',
+    candidateEmail: 'samira.khan@example.com',
+    source: 'Referral',
+    notes: 'Customer escalation and renewals experience.',
+    stage: 'HIRED',
+    appliedAt: daysAgo(55),
+    stageEnteredAt: daysAgo(1),
+    interviewScheduledAt: daysAgo(9),
+  },
+  {
+    id: 'app-ethan-lee-frontend',
+    jobOpeningId: 'job-frontend-engineer',
+    candidateName: 'Ethan Lee',
+    candidateEmail: 'ethan.lee@example.com',
+    source: 'Agency',
+    notes: 'Recent applicant for frontend opening.',
+    stage: 'APPLIED',
+    appliedAt: daysAgo(0),
+    stageEnteredAt: daysAgo(0),
+    interviewScheduledAt: null,
   },
 ];
 
@@ -144,6 +238,11 @@ async function main() {
         candidateEmail: application.candidateEmail,
         source: application.source,
         notes: application.notes,
+        stage: application.stage,
+        rejectedFromStage: application.rejectedFromStage ?? null,
+        appliedAt: application.appliedAt,
+        stageEnteredAt: application.stageEnteredAt,
+        interviewScheduledAt: application.interviewScheduledAt,
       },
       create: application,
     });

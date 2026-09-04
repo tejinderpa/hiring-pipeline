@@ -43,40 +43,58 @@ model User {
 
   applicationEvents      ApplicationEvent[]       @relation("ApplicationEventActor")
   applicationAssignments ApplicationInterviewer[]
+  alertDismissals        AlertDismissal[]         @relation("AlertDismissalRecruiter")
   feedback               Feedback[]
 }
 
 model JobOpening {
-  id           String        @id @default(uuid())
-  title        String
-  department   String
-  description  String
-  status       JobStatus     @default(OPEN)
-  archivedAt   DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String    @id @default(uuid())
+  title       String
+  department  String
+  description String
+  status      JobStatus @default(OPEN)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   applications Application[]
 }
 
 model Application {
-  id             String           @id @default(uuid())
-  jobOpeningId   String
-  candidateName  String
-  candidateEmail String
-  source         String
-  notes          String?
-  stage          ApplicationStage @default(APPLIED)
-  rejectedFromStage ApplicationStage?
-  appliedAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                   String            @id @default(uuid())
+  jobOpeningId         String
+  candidateName        String
+  candidateEmail       String
+  source               String
+  notes                String?
+  stage                ApplicationStage  @default(APPLIED)
+  rejectedFromStage    ApplicationStage?
+  appliedAt            DateTime          @default(now())
+  stageEnteredAt       DateTime          @default(now())
+  interviewScheduledAt DateTime?
+  updatedAt            DateTime          @updatedAt
 
-  jobOpening   JobOpening       @relation(fields: [jobOpeningId], references: [id], onDelete: Restrict)
-  events       ApplicationEvent[]
-  interviewers ApplicationInterviewer[]
-  feedback     Feedback[]
+  jobOpening      JobOpening               @relation(fields: [jobOpeningId], references: [id], onDelete: Restrict)
+  alertDismissals AlertDismissal[]
+  events          ApplicationEvent[]
+  interviewers    ApplicationInterviewer[]
+  feedback        Feedback[]
 
   @@index([jobOpeningId])
+}
+
+model AlertDismissal {
+  id            String           @id @default(uuid())
+  applicationId String
+  stage         ApplicationStage
+  dismissedBy   String
+  dismissedAt   DateTime         @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  recruiter   User        @relation("AlertDismissalRecruiter", fields: [dismissedBy], references: [id], onDelete: Restrict)
+
+  @@unique([applicationId, stage])
+  @@index([dismissedBy])
 }
 
 model ApplicationInterviewer {
@@ -115,8 +133,8 @@ model ApplicationEvent {
   metadata      Json?
   createdAt     DateTime             @default(now())
 
-  application   Application          @relation(fields: [applicationId], references: [id], onDelete: Restrict)
-  actor         User                 @relation("ApplicationEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  actor       User        @relation("ApplicationEventActor", fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([applicationId, createdAt])
   @@index([actorId])
