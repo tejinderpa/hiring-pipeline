@@ -23,12 +23,29 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function formatDateInput(value) {
+function formatDateTime(value) {
+  if (!value) {
+    return 'Not set';
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatDateTimeInput(value) {
   if (!value) {
     return '';
   }
 
-  return new Date(value).toISOString().slice(0, 10);
+  const date = new Date(value);
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+
+  return localDate.toISOString().slice(0, 16);
 }
 
 function StatusBadge({ status }) {
@@ -136,14 +153,14 @@ function ApplicationFormModal({ error, form, isSaving, mode, onChange, onClose, 
 
           <div>
             <label className="text-sm font-medium text-slate-700" htmlFor="candidate-interview-scheduled-at">
-              Interview scheduled date
+              Interview scheduled time
             </label>
             <input
               className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-700 focus:ring-4 focus:ring-cyan-700/10"
               id="candidate-interview-scheduled-at"
               name="interviewScheduledAt"
               onChange={onChange}
-              type="date"
+              type="datetime-local"
               value={form.interviewScheduledAt}
             />
           </div>
@@ -285,7 +302,7 @@ function JobDetailPage({ requestJson, token }) {
       candidateEmail: application.candidateEmail,
       source: application.source,
       notes: application.notes || '',
-      interviewScheduledAt: formatDateInput(application.interviewScheduledAt),
+      interviewScheduledAt: formatDateTimeInput(application.interviewScheduledAt),
     });
     setModalError('');
     setApplicationMode('edit');
@@ -426,6 +443,7 @@ function JobDetailPage({ requestJson, token }) {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Stage</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Applied Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Interview</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
                 </tr>
               </thead>
@@ -437,6 +455,7 @@ function JobDetailPage({ requestJson, token }) {
                     <td className="px-4 py-4 text-sm text-slate-700">{application.source}</td>
                     <td className="px-4 py-4"><StageBadge stage={application.stage} /></td>
                     <td className="px-4 py-4 text-sm text-slate-700">{formatDate(application.appliedAt)}</td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{formatDateTime(application.interviewScheduledAt)}</td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end">
                         <button
@@ -451,7 +470,7 @@ function JobDetailPage({ requestJson, token }) {
                   </tr>
                 )) : (
                   <tr>
-                    <td className="px-4 py-12 text-center" colSpan="6">
+                    <td className="px-4 py-12 text-center" colSpan="7">
                       <p className="text-sm font-semibold text-slate-950">No applications yet.</p>
                       <p className="mt-1 text-sm text-slate-500">Add a candidate to start tracking this opening.</p>
                     </td>

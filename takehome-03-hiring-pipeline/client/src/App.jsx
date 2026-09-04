@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 
+import AlertsPage from './pages/AlertsPage.jsx';
 import CandidatesPage from './pages/CandidatesPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
 import JobDetailPage from './pages/JobDetailPage.jsx';
 import JobOpeningsPage from './pages/JobOpeningsPage.jsx';
 
@@ -10,10 +12,10 @@ const AUTH_TOKEN_KEY = 'hiringPipelineToken';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const navigationItems = [
-  { label: 'Dashboard', icon: DashboardIcon, path: '/' },
+  { label: 'Dashboard', icon: DashboardIcon, path: '/', roles: ['RECRUITER'] },
   { label: 'Job Openings', icon: BriefcaseIcon, path: '/jobs', roles: ['RECRUITER'] },
   { label: 'Candidates', icon: UsersIcon, path: '/candidates', roles: ['RECRUITER'] },
-  { label: 'Alerts', icon: BellIcon, path: '/alerts' },
+  { label: 'Alerts', icon: BellIcon, path: '/alerts', roles: ['RECRUITER'] },
 ];
 
 function getDisplayName(user) {
@@ -163,7 +165,7 @@ function UserAvatar({ name }) {
   );
 }
 
-function SidebarNavItem({ item }) {
+function SidebarNavItem({ alertCount, item }) {
   const Icon = item.icon;
 
   return (
@@ -180,6 +182,11 @@ function SidebarNavItem({ item }) {
     >
       <Icon />
       <span>{item.label}</span>
+      {item.path === '/alerts' && alertCount > 0 ? (
+        <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-cyan-700 px-2 py-0.5 text-xs font-semibold text-white">
+          {alertCount}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
@@ -402,7 +409,7 @@ function RecruiterOnlyRoute({ icon = BriefcaseIcon, title = 'You do not have acc
   return children;
 }
 
-function AppLayout({ user, onLogout }) {
+function AppLayout({ alertCount, user, onLogout }) {
   const displayName = getDisplayName(user);
   const visibleNavigationItems = navigationItems.filter((item) => (
     !item.roles || item.roles.includes(user.role)
@@ -423,7 +430,7 @@ function AppLayout({ user, onLogout }) {
 
             <nav className="flex gap-2 overflow-x-auto px-4 py-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:px-4 lg:py-5">
               {visibleNavigationItems.map((item) => (
-                <SidebarNavItem item={item} key={item.label} />
+                <SidebarNavItem alertCount={alertCount} item={item} key={item.label} />
               ))}
             </nav>
 
@@ -479,7 +486,26 @@ function AppLayout({ user, onLogout }) {
 function App() {
   const navigate = useNavigate();
   const [authStatus, setAuthStatus] = useState('checking');
+  const [stalledAlertCount, setStalledAlertCount] = useState(0);
   const [user, setUser] = useState(null);
+  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+
+  const refreshStalledAlertCount = useCallback(async () => {
+    const currentToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
+
+    if (!currentToken) {
+      setStalledAlertCount(0);
+      return;
+    }
+
+    const data = await requestJson('/api/alerts/stalled', {
+      headers: {
+        Authorization: `Bearer ${currentToken}`,
+      },
+    });
+
+    setStalledAlertCount(data.count ?? 0);
+  }, []);
 
   useEffect(() => {
     const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
@@ -510,6 +536,17 @@ function App() {
     loadCurrentUser();
   }, [navigate]);
 
+  useEffect(() => {
+    if (user?.role !== 'RECRUITER') {
+      setStalledAlertCount(0);
+      return;
+    }
+
+    refreshStalledAlertCount().catch(() => {
+      setStalledAlertCount(0);
+    });
+  }, [refreshStalledAlertCount, user]);
+
   function handleLogin(nextUser) {
     setUser(nextUser);
     setAuthStatus('signed-in');
@@ -517,6 +554,7 @@ function App() {
 
   function handleLogout() {
     window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setStalledAlertCount(0);
     setUser(null);
     setAuthStatus('signed-out');
     navigate('/login', { replace: true });
@@ -531,19 +569,23 @@ function App() {
       <Route
         element={(
           <ProtectedRoute authStatus={authStatus} user={user}>
-            <AppLayout onLogout={handleLogout} user={user} />
+            <AppLayout alertCount={stalledAlertCount} onLogout={handleLogout} user={user} />
           </ProtectedRoute>
         )}
         path="/"
       >
         <Route
           index
-          element={<PlaceholderPage icon={DashboardIcon} title="Your recruiting workspace is ready." />}
+          element={(
+            <RecruiterOnlyRoute icon={DashboardIcon} title="You do not have access to the dashboard." user={user}>
+              <DashboardPage requestJson={requestJson} token={token} />
+            </RecruiterOnlyRoute>
+          )}
         />
         <Route
           element={(
             <RecruiterOnlyRoute user={user}>
-              <JobOpeningsPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+              <JobOpeningsPage requestJson={requestJson} token={token} />
             </RecruiterOnlyRoute>
           )}
           path="jobs"
@@ -551,7 +593,7 @@ function App() {
         <Route
           element={(
             <RecruiterOnlyRoute user={user}>
-              <JobDetailPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+              <JobDetailPage requestJson={requestJson} token={token} />
             </RecruiterOnlyRoute>
           )}
           path="jobs/:id"
@@ -559,13 +601,21 @@ function App() {
         <Route
           element={(
             <RecruiterOnlyRoute icon={UsersIcon} title="You do not have access to candidates." user={user}>
-              <CandidatesPage requestJson={requestJson} token={window.localStorage.getItem(AUTH_TOKEN_KEY)} />
+              <CandidatesPage requestJson={requestJson} token={token} />
             </RecruiterOnlyRoute>
           )}
           path="candidates"
         />
         <Route
-          element={<PlaceholderPage icon={BellIcon} title="Alerts are not part of today's scope." />}
+          element={(
+            <RecruiterOnlyRoute icon={BellIcon} title="You do not have access to alerts." user={user}>
+              <AlertsPage
+                onAlertsChanged={setStalledAlertCount}
+                requestJson={requestJson}
+                token={token}
+              />
+            </RecruiterOnlyRoute>
+          )}
           path="alerts"
         />
       </Route>
