@@ -618,3 +618,61 @@ Codex reviewed the implementation, found no feature defects, and updated `docs/a
 ### What you corrected
 
 No additional implementation correction was made during this audit pass before documentation updates.
+
+# 4 September : Goals 8 and 10
+
+## Dashboard and stalled-alert schema
+
+### Prompt
+
+Asked Codex to implement Phase 1 for Goal 8 and Goal 10 only after inspecting the existing backend/frontend architecture, Prisma schema, centralized stage transition logic, auth/RBAC middleware, application routes, frontend routing/layout/navigation, API client patterns, and seed data. The schema requirements were `Application.stageEnteredAt`, stage-scoped `AlertDismissal`, optional `interviewScheduledAt` if no scheduling timestamp existed, and seed data that demonstrates dashboard and stalled-alert behavior.
+
+### What Codex produced
+
+Codex added `stageEnteredAt`, `interviewScheduledAt`, and `AlertDismissal` to the Prisma schema and migration. It backfilled `stageEnteredAt` from matching stage events or `appliedAt`, updated centralized pipeline transition builders to set `stageEnteredAt` on advance/reject/reinstate, added minimal create/edit support for `interviewScheduledAt`, exposed the interview date in the existing candidate modal, enriched seed data, and added focused tests.
+
+### What you corrected
+
+No product behavior correction was needed. Codex initially attempted to patch files relative to the wrong workspace directory; it detected the failed patch and reapplied it with the correct project-relative paths. Local PowerShell blocked `npm.ps1`/`npx.ps1`, so verification used `npm.cmd` and `npx.cmd`.
+
+## Dashboard and stalled-alert backend APIs
+
+### Prompt
+
+Asked Codex to implement Phase 2 backend behavior for Goal 8 and Goal 10: recruiter-only `GET /api/dashboard`, recruiter-only `GET /api/alerts/stalled`, recruiter-only dismiss endpoint, strict `> 10 days` stalled semantics, dashboard metrics using server aggregation, scheduled interview dates, `stageEnteredAt` for current-month hires, and computed alerts rather than cron or stored alert rows.
+
+### What Codex produced
+
+Codex added `server/src/dashboard.js`, `server/src/dashboardMetrics.js`, `server/src/alerts.js`, and `server/src/stalledAlerts.js`, mounted them in `server/src/index.js`, and added tests covering dashboard definitions, UTC date windows, weekly zero-fill behavior, stalled thresholds, dismissal scoping, recruiter-only route wiring, and ordinary application edits not resetting `stageEnteredAt`.
+
+### What you corrected
+
+While implementing, Codex noticed Prisma cannot express "no dismissal whose stage equals this row's current stage" as a simple relation filter. It corrected the approach to filter by stalled candidates in the database, include dismissal stages in the same query, and then exclude only dismissals matching the candidate's current stage in application code.
+
+## Dashboard and stalled-alert frontend
+
+### Prompt
+
+Asked Codex to implement Phase 3 frontend behavior directly in the existing React architecture: recruiter dashboard landing page, four KPI cards, charts for server-provided aggregates, recruiter-only Alerts navigation with count badge, stalled alerts page, dismiss flow, and minimal interview scheduling control in the existing candidate workflow.
+
+### What Codex produced
+
+Codex added `client/src/pages/DashboardPage.jsx` and `client/src/pages/AlertsPage.jsx`, installed Recharts, wired recruiter-only dashboard and alert routes in `client/src/App.jsx`, added alert-count state in the layout, refetched the count after dismiss, and refined the existing candidate interview control to `datetime-local` with display in the job detail table.
+
+### What you corrected
+
+No product behavior correction was needed. Codex fixed a small JSX edge case where an empty weekly-series length could render as `0`. Installing Recharts initially failed because the sandboxed npm run could not reach the registry, so Codex reran `npm.cmd install recharts` with approval.
+
+## Goal 8/10 focused review and documentation
+
+### Prompt
+
+Asked Codex to review only the completed Goal 8 and Goal 10 implementation for dashboard metric correctness, stalled-alert boundary semantics, dismissal scoping, stage timestamp behavior, server/client aggregation boundaries, RBAC, N+1 risks, indexes, seed usefulness, and documentation accuracy. The request also asked Codex to fix only concrete issues and update `docs/schema.md`, `docs/architecture.md`, `docs/decisions.md`, `docs/plan.md`, and this prompt log.
+
+### What Codex produced
+
+Codex found the main functional behavior aligned with the assignment and identified a concrete database-read-path gap: the new dashboard and alert filters needed supporting indexes. It added indexes for `Application.stage`, `Application.stageEnteredAt`, `Application.interviewScheduledAt`, and `Application.appliedAt`, plus a separate idempotent migration for already-migrated databases. It also updated the documentation files requested in the prompt.
+
+### What you corrected
+
+No manual correction has been applied yet in this review pass. Final manual timing and any subjective process notes should be filled in by the project owner if the submission needs exact hour accounting.

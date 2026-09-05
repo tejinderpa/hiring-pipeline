@@ -86,6 +86,25 @@ POST /api/applications/:id/advance
 
 The request body is not allowed to choose the destination stage. A generic `PATCH /api/applications/:id` can edit candidate fields, but explicitly rejects `stage`.
 
+## Dashboard Request Path
+
+Recruiter opens the dashboard:
+
+```text
+GET /api/dashboard
+-> authenticate bearer JWT
+-> requireRole('RECRUITER')
+-> compute UTC week, month, and 13-week reporting boundaries
+-> count open, unarchived job openings
+-> count active applications, excluding HIRED and REJECTED
+-> count applications with interviewScheduledAt in the current UTC week
+-> count applications currently in HIRED with stageEnteredAt in the current UTC month
+-> aggregate current applications by stage in the database
+-> read job openings with application counts in one query
+-> read appliedAt values inside the last-quarter reporting window
+-> return frontend-ready metric arrays, including zero-count weeks
+```
+
 ## Timeline Reads
 
 `GET /api/applications/:id/history` returns immutable events for one application ordered oldest-to-newest. Actor information is limited to safe display fields: `id`, `email`, and `role`. Password hashes are never selected for this response.
@@ -98,6 +117,8 @@ The request body is not allowed to choose the destination stage. A generic `PATC
 
 `POST /api/alerts/stalled/:applicationId/dismiss` loads the current application, verifies that it is still stalled, and upserts an `AlertDismissal` for the current stage only. The client cannot choose the dismissal stage.
 
+Stalled alerts are computed on request rather than stored as generated `Alert` rows because stalled state is derived data: it follows directly from the application's current `stage`, its `stageEnteredAt` timestamp, the current time, and any stage-scoped dismissal. A cron job would add operational complexity and create a second source of truth that could drift when an application advances, is rejected, is reinstated, or has a dismissal recorded.
+
 ## Deliberately Not Built Yet
 
-The application does not yet include dashboard or alert frontend screens, frontend timeline controls, or filtering the CSV export by the current candidate-list query. Bulk selection/export are implemented only on the recruiter candidate list; there is no interviewer bulk UI.
+The application does not yet include frontend timeline controls or filtering the CSV export by the current candidate-list query. Bulk selection/export are implemented only on the recruiter candidate list; there is no interviewer bulk UI.

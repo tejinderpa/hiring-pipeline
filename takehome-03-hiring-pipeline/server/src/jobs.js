@@ -275,6 +275,32 @@ async function findJobWithApplications(id) {
     include: {
       applications: {
         orderBy: { appliedAt: 'desc' },
+        include: {
+          interviewers: {
+            orderBy: { assignedAt: 'asc' },
+            include: {
+              interviewer: {
+                select: {
+                  id: true,
+                  email: true,
+                  role: true,
+                },
+              },
+            },
+          },
+          feedback: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              interviewer: {
+                select: {
+                  id: true,
+                  email: true,
+                  role: true,
+                },
+              },
+            },
+          },
+        },
       },
     },
   });

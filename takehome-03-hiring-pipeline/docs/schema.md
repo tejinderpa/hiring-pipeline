@@ -15,6 +15,7 @@ Relationships:
 
 - One `User` can be the actor for many `ApplicationEvent` rows through `ApplicationEvent.actorId`.
 - One `User` can be assigned to many applications through `ApplicationInterviewer`.
+- One recruiter `User` can dismiss many stalled application alerts through `AlertDismissal.dismissedBy`.
 - One interviewer `User` can leave many `Feedback` rows.
 
 ## JobOpening
@@ -148,6 +149,10 @@ Relationships:
 Indexes:
 
 - `Application.jobOpeningId` for fetching applications under a job.
+- `Application.stage` for dashboard stage counts and active/terminal-stage filters.
+- `Application.stageEnteredAt` for stalled-alert and current-month hire filters.
+- `Application.interviewScheduledAt` for scheduled-interview dashboard filters.
+- `Application.appliedAt` for weekly application reporting and applied-date sorting.
 - `ApplicationInterviewer.interviewerId` for fetching an interviewer's assigned applications.
 - `Feedback.applicationId, createdAt` for chronological feedback reads.
 - `Feedback.interviewerId` for interviewer feedback lookups.
@@ -155,6 +160,8 @@ Indexes:
 - `ApplicationEvent.actorId` for future actor-based audit queries.
 
 No schema change was required for Requirements 6 and 7. Candidate search, filtering, sorting, pagination, bulk actions, and CSV export reuse the existing `Application`, `JobOpening`, and `ApplicationEvent` tables.
+
+Goals 8 and 10 added `Application.stageEnteredAt`, `Application.interviewScheduledAt`, and `AlertDismissal` so dashboard metrics and stalled-alert dismissals have explicit data instead of relying on unrelated edit timestamps.
 
 ## Database vs Application Constraints
 
@@ -192,7 +199,11 @@ These pipeline rules stay in application code because they are workflow rules, n
 
 ## Query Patterns And Scaling Limitations
 
-`GET /api/applications` now applies search, filters, sorting, offset pagination, and filtered counts in Prisma rather than loading all applications into memory. The current `Application.jobOpeningId` index helps job filtering. At 100x data, candidate search over `candidateName` and `candidateEmail`, source filtering, stage sorting/filtering, and updated-date ordering may need additional database indexes or a Postgres text-search strategy based on real usage.
+`GET /api/applications` now applies search, filters, sorting, offset pagination, and filtered counts in Prisma rather than loading all applications into memory. The current `Application.jobOpeningId` index helps job filtering. At 100x data, candidate search over `candidateName` and `candidateEmail`, source filtering, and updated-date ordering may need additional database indexes or a Postgres text-search strategy based on real usage.
+
+The dashboard endpoint uses database aggregation for stage counts and job counts. The weekly last-quarter chart reads only bounded `appliedAt` values for the latest 13 UTC calendar weeks and fills missing weeks in application code. At much larger scale this could move to a database `date_trunc('week', appliedAt)` query or materialized reporting table, but the current bounded read keeps the implementation understandable for the take-home scope.
+
+Stalled alerts are computed from indexed `stage` and `stageEnteredAt` filters, then current-stage dismissals are checked from included `AlertDismissal` rows. If the data set grows substantially, a composite index on `Application(stage, stageEnteredAt)` and tighter relation filtering around dismissals may be worthwhile.
 
 The CSV export intentionally reads the full active pipeline because the assignment asks for a snapshot, not one UI page. At much larger scale this may need streaming CSV output instead of building the whole file in memory.
 

@@ -126,3 +126,43 @@ Added `GET /api/applications/export` for a CSV snapshot of non-rejected applicat
 ### Deferred / cut
 
 Did not implement cross-page selection, CSV filtering by current search criteria, dashboard analytics, or stalled-application alerts.
+
+## Session 5 - September 4
+
+### Planned
+
+- Implement Goal 8 dashboard foundations.
+- Implement Goal 10 stalled-alert foundations.
+- Add `stageEnteredAt` so stalled alerts measure time in the current stage rather than general edits.
+- Add scheduled interview data if the existing schema did not already support it.
+- Keep stage timestamp updates centralized in the existing pipeline transition logic.
+
+### Actual
+
+Added `Application.stageEnteredAt`, `Application.interviewScheduledAt`, and the stage-scoped `AlertDismissal` model. Existing applications are backfilled from the latest matching stage event for their current stage where possible, otherwise from `appliedAt`.
+
+Updated the centralized pipeline transition helpers so advance, reject, reinstate, and bulk actions update `stageEnteredAt`. Generic candidate edits still do not modify it.
+
+Added recruiter-only backend APIs:
+
+- `GET /api/dashboard`
+- `GET /api/alerts/stalled`
+- `POST /api/alerts/stalled/:applicationId/dismiss`
+
+Added the recruiter dashboard UI, stalled alerts UI, alert-count navigation badge, and minimal interview scheduled date/time control in the existing candidate create/edit workflow.
+
+Added focused tests for dashboard date ranges, weekly reporting, stalled alert thresholds, current-stage dismissal scope, route authorization, and normal edits not resetting `stageEnteredAt`.
+
+### Time Notes
+
+Exact wall-clock time for this session should be filled in manually if needed. The work was completed across incremental schema, backend API, frontend, verification, and documentation passes.
+
+### Deferred / cut
+
+- No cron job or persistent generated `Alert` table.
+- No websocket/polling notifications.
+- No email alerts.
+- No elaborate alert preferences.
+- No separate calendar product.
+- No frontend timeline controls.
+- No CSV export filtering by the current candidate-list query.

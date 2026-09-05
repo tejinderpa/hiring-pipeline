@@ -81,6 +81,10 @@ model Application {
   feedback        Feedback[]
 
   @@index([jobOpeningId])
+  @@index([stage])
+  @@index([stageEnteredAt])
+  @@index([interviewScheduledAt])
+  @@index([appliedAt])
 }
 
 model AlertDismissal {

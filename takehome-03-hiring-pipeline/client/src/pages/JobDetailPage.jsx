@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 
 import JobFormModal from '../components/JobFormModal.jsx';
@@ -24,6 +25,17 @@ const emptyApplicationForm = {
   appliedAt: getTodayDateInput(),
   interviewScheduledAt: '',
 };
+
+function getUserLabel(user) {
+  const email = user?.email || '';
+  const name = email
+    .split('@')[0]
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+  return name || email || 'Interviewer';
+}
 
 function formatDate(value) {
   if (!value) return 'Not set';
@@ -79,6 +91,128 @@ function StageBadge({ stage }) {
     <span className={`inline-flex h-6 items-center rounded-lg border px-2.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}>
       {stage}
     </span>
+  );
+}
+
+function InterviewerChips({ assignments = [] }) {
+  if (!assignments.length) {
+    return <span className="text-sm text-slate-400">Unassigned</span>;
+  }
+
+  return (
+    <div className="flex max-w-56 flex-wrap gap-1.5">
+      {assignments.slice(0, 2).map((assignment) => (
+        <span
+          className="inline-flex max-w-32 items-center rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700"
+          key={assignment.interviewerId}
+          title={assignment.interviewer?.email}
+        >
+          <span className="truncate">{getUserLabel(assignment.interviewer)}</span>
+        </span>
+      ))}
+      {assignments.length > 2 ? (
+        <span className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+          +{assignments.length - 2}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function AssignmentModal({
+  application,
+  error,
+  interviewers,
+  isLoading,
+  onAssign,
+  onClose,
+  onRemove,
+  pendingInterviewerId,
+}) {
+  const assignedIds = new Set((application?.interviewers || []).map((assignment) => assignment.interviewerId));
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 sm:p-6 animate-fade-in">
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex max-h-[calc(100vh-3rem)] w-full max-w-xl animate-scale-in flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-bold text-slate-900">Assign Interviewers</h2>
+            <p className="mt-1 truncate text-xs text-slate-500">{application?.candidateName}</p>
+          </div>
+          <button
+            aria-label="Close modal"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-3">
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{error}</div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-400">
+              <span className="h-4 w-4 rounded-full border-2 border-[#6c5ce7]/30 border-t-[#6c5ce7] animate-spin-smooth" />
+              Loading interviewers...
+            </div>
+          ) : interviewers.length ? (
+            <div className="grid gap-2">
+              {interviewers.map((interviewer) => {
+                const isAssigned = assignedIds.has(interviewer.id);
+                const isPending = pendingInterviewerId === interviewer.id;
+
+                return (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-[#faf9fd] px-4 py-3 transition hover:bg-white"
+                    key={interviewer.id}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f0edff] text-xs font-bold text-[#5a49d6]">
+                        {interviewer.email.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">{getUserLabel(interviewer)}</p>
+                        <p className="truncate text-xs text-slate-500">{interviewer.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      className={`inline-flex h-8 min-w-20 items-center justify-center rounded-lg px-3 text-xs font-bold shadow-xs transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isAssigned
+                          ? 'border border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          : 'border border-[#6c5ce7] bg-[#6c5ce7] text-white hover:bg-[#5a49d6]'
+                      }`}
+                      disabled={isPending}
+                      onClick={() => (isAssigned ? onRemove(interviewer.id) : onAssign(interviewer.id))}
+                      type="button"
+                    >
+                      {isPending ? 'Saving...' : isAssigned ? 'Remove' : 'Assign'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-[#faf9fd] px-4 py-10 text-center text-xs text-slate-500">
+              No interviewer users found.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

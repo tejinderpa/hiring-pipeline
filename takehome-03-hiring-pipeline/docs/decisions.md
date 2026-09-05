@@ -227,3 +227,25 @@ Exporting only the current UI page or adding a new application status field.
 
 Why:
 The assignment asks for a pipeline snapshot, not a paginated page export. The existing schema already has job `status`, job `archivedAt`, and application `stage`, which are enough to define the active pipeline for this implementation.
+
+## Decision 19 - Stage-scoped stalled alert dismissals
+
+Chose:
+Stage-scoped `AlertDismissal` records keyed by `applicationId` and `stage`.
+
+Rejected:
+A global `alertDismissed` boolean on `Application`.
+
+Why:
+A global boolean would permanently suppress future stalled alerts for that application. Stage-scoped dismissal lets a recruiter dismiss a `SCREENING` alert, then see a new alert later if the same candidate advances to `INTERVIEW` and stalls there.
+
+## Decision 20 - Compute stalled alerts on request
+
+Chose:
+Compute stalled alerts from `Application.stageEnteredAt`, current application stage, current time, and `AlertDismissal` rows when `/api/alerts/stalled` is requested.
+
+Rejected:
+A cron job and persistent generated `Alert` table.
+
+Why:
+Stalled status is derived from current state. Persisting generated alerts would create another source of truth that must be synchronized whenever a candidate advances, is rejected, is reinstated, or has an alert dismissed. For the take-home scope, computed alerts are simpler and less error-prone.

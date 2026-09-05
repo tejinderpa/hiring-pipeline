@@ -395,6 +395,7 @@ router.get('/', async (req, res, next) => {
       candidateName: true,
       candidateEmail: true,
       source: true,
+      notes: true,
       stage: true,
       appliedAt: true,
       stageEnteredAt: true,
@@ -405,6 +406,18 @@ router.get('/', async (req, res, next) => {
         select: {
           id: true,
           title: true,
+        },
+      },
+      interviewers: {
+        select: {
+          interviewerId: true,
+          assignedAt: true,
+          interviewer: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
         },
       },
     };

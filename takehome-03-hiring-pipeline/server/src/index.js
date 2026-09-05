@@ -9,6 +9,7 @@ import dashboardRouter from './dashboard.js';
 import demoRouter from './demo.js';
 import interviewerRouter from './interviewer.js';
 import jobsRouter from './jobs.js';
+import usersRouter from './users.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -29,6 +30,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/demo', demoRouter);
 app.use('/api/interviewer', interviewerRouter);
 app.use('/api/jobs', jobsRouter);
+app.use('/api/users', usersRouter);
 
 app.use((error, req, res, next) => {
   console.error(error);

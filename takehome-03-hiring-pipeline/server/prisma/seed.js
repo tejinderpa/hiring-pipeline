@@ -428,6 +428,61 @@ async function main() {
       create: application,
     });
   }
+
+  const interviewerUser = await prisma.user.findUnique({
+    where: { email: 'interviewer@example.com' },
+  });
+
+  if (interviewerUser) {
+    const assignments = [
+      'app-daniel-cho-frontend',
+      'app-paloma-cruz-data',
+      'app-asha-mehta-frontend',
+      'app-omar-nadeem-customer-success',
+    ];
+
+    for (const applicationId of assignments) {
+      await prisma.applicationInterviewer.upsert({
+        where: {
+          applicationId_interviewerId: {
+            applicationId,
+            interviewerId: interviewerUser.id,
+          },
+        },
+        update: {},
+        create: {
+          applicationId,
+          interviewerId: interviewerUser.id,
+        },
+      });
+    }
+
+    const sampleFeedbackId = 'feedback-paloma-data-demo';
+    const existingFeedback = await prisma.feedback.findUnique({
+      where: { id: sampleFeedbackId },
+    });
+    if (!existingFeedback) {
+      const feedback = await prisma.feedback.create({
+        data: {
+          id: sampleFeedbackId,
+          applicationId: 'app-paloma-cruz-data',
+          interviewerId: interviewerUser.id,
+          content: '[Recommendation: Strong Hire] Paloma showed deep mastery in SQL and data modeling during our technical review. Communication was articulate and concise. Highly recommend moving to Offer.',
+        },
+      });
+      await prisma.applicationEvent.create({
+        data: {
+          applicationId: 'app-paloma-cruz-data',
+          actorId: interviewerUser.id,
+          type: 'FEEDBACK_ADDED',
+          metadata: {
+            feedbackId: feedback.id,
+            content: feedback.content,
+          },
+        },
+      });
+    }
+  }
 }
 
 main()

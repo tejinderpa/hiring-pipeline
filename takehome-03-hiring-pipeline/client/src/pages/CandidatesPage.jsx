@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import PageHeader from '../components/PageHeader.jsx';
@@ -11,13 +12,13 @@ const sortOptions = [
   { label: 'Stage',        value: 'stage' },
 ];
 const tableHeaders = [
-  { label: 'Candidate', className: 'w-[18%]' },
-  { label: 'Email', className: 'w-[20%]' },
-  { label: 'Job Opening', className: 'w-[18%]' },
-  { label: 'Source', className: 'w-[12%]' },
-  { label: 'Stage', className: 'w-[12%]' },
-  { label: 'Applied Date', className: 'w-[10%] whitespace-nowrap' },
-  { label: 'Last Updated', className: 'w-[10%] whitespace-nowrap' },
+  { label: 'Candidate', className: 'w-[16%]' },
+  { label: 'Email', className: 'w-[16%]' },
+  { label: 'Job Opening', className: 'w-[15%]' },
+  { label: 'Stage', className: 'w-[11%]' },
+  { label: 'Interviewers', className: 'w-[17%]' },
+  { label: 'Applied Date', className: 'w-[11%] whitespace-nowrap' },
+  { label: 'Actions', className: 'w-[14%] whitespace-nowrap text-right' },
 ];
 const limit = 20;
 
@@ -25,6 +26,247 @@ function formatDate(value) {
   if (!value) return 'Not set';
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' })
     .format(new Date(value));
+}
+
+function UsersIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function AssignmentModal({
+  application,
+  error,
+  interviewers,
+  isLoading,
+  onAssign,
+  onClose,
+  onRemove,
+  pendingInterviewerId,
+}) {
+  const assignedIds = new Set((application?.interviewers || []).map((assignment) => assignment.interviewerId));
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 sm:p-6 animate-fade-in">
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex max-h-[calc(100vh-3rem)] w-full max-w-lg animate-scale-in flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-bold text-slate-900">Assign Interview Panel</h2>
+            <p className="mt-0.5 truncate text-xs text-slate-500">
+              {application?.candidateName} {application?.jobOpening?.title ? `• ${application.jobOpening.title}` : ''}
+            </p>
+          </div>
+          <button
+            aria-label="Close modal"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-3">
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{error}</div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-400">
+              <span className="h-4 w-4 rounded-full border-2 border-[#6c5ce7]/30 border-t-[#6c5ce7] animate-spin-smooth" />
+              Loading interviewers...
+            </div>
+          ) : interviewers.length ? (
+            <div className="grid gap-2">
+              {interviewers.map((interviewer) => {
+                const isAssigned = assignedIds.has(interviewer.id);
+                const isPending = pendingInterviewerId === interviewer.id;
+
+                return (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-[#faf9fd] px-4 py-3 transition hover:bg-white"
+                    key={interviewer.id}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f0edff] text-xs font-bold text-[#5a49d6]">
+                        {interviewer.email.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">{interviewer.email.split('@')[0]}</p>
+                        <p className="truncate text-xs text-slate-500">{interviewer.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      className={`inline-flex h-8 min-w-20 items-center justify-center rounded-lg px-3 text-xs font-bold shadow-xs transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isAssigned
+                          ? 'border border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          : 'border border-[#6c5ce7] bg-[#6c5ce7] text-white hover:bg-[#5a49d6]'
+                      }`}
+                      disabled={isPending}
+                      onClick={() => (isAssigned ? onRemove(interviewer.id) : onAssign(interviewer.id))}
+                      type="button"
+                    >
+                      {isPending ? 'Saving...' : isAssigned ? 'Remove' : 'Assign'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-[#faf9fd] px-4 py-10 text-center text-xs text-slate-500">
+              No interviewer accounts found.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function BulkAssignmentModal({
+  error,
+  interviewers,
+  isLoading,
+  onAssign,
+  onClose,
+  pendingInterviewerId,
+  selectedApplications,
+}) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4 sm:p-6 animate-fade-in">
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex max-h-[calc(100vh-3rem)] w-full max-w-xl animate-scale-in flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-slate-900">Assign Interviewer to Multiple Candidates</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Assign a panel interviewer across {selectedApplications.length} selected candidates at once.
+            </p>
+          </div>
+          <button
+            aria-label="Close modal"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="shrink-0 border-b border-slate-100 bg-[#faf9fd] px-6 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            Selected Candidates ({selectedApplications.length}):
+          </p>
+          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+            {selectedApplications.map((app) => (
+              <span
+                key={app.id}
+                className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700 shadow-xs"
+              >
+                <span>{app.candidateName}</span>
+                {app.jobOpening?.title ? (
+                  <span className="text-[10px] text-slate-400">({app.jobOpening.title})</span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-3">
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{error}</div>
+          ) : null}
+
+          <p className="text-xs font-bold text-slate-700">Choose an interviewer to assign:</p>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-400">
+              <span className="h-4 w-4 rounded-full border-2 border-[#6c5ce7]/30 border-t-[#6c5ce7] animate-spin-smooth" />
+              Loading interviewers...
+            </div>
+          ) : interviewers.length ? (
+            <div className="grid gap-2.5">
+              {interviewers.map((interviewer) => {
+                const isPending = pendingInterviewerId === interviewer.id;
+                const alreadyAssignedCount = selectedApplications.filter((app) =>
+                  (app.interviewers || []).some((i) => i.interviewerId === interviewer.id)
+                ).length;
+                const toAssignCount = selectedApplications.length - alreadyAssignedCount;
+
+                return (
+                  <div
+                    key={interviewer.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-[#faf9fd] p-3.5 transition hover:bg-white hover:border-[#6c5ce7]/40"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f0edff] text-xs font-bold text-[#5a49d6]">
+                        {interviewer.email.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">{interviewer.email.split('@')[0]}</p>
+                        <p className="truncate text-xs text-slate-500">{interviewer.email}</p>
+                        {alreadyAssignedCount > 0 ? (
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Already on {alreadyAssignedCount} of {selectedApplications.length} candidates
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <button
+                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#6c5ce7] px-4 text-xs font-bold text-white shadow-xs shadow-[#6c5ce7]/20 transition hover:bg-[#5a49d6] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                      disabled={isPending || toAssignCount === 0}
+                      onClick={() => onAssign(interviewer)}
+                      type="button"
+                    >
+                      {isPending ? (
+                        <>
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin-smooth" />
+                          <span>Assigning...</span>
+                        </>
+                      ) : toAssignCount === 0 ? (
+                        'All Assigned'
+                      ) : (
+                        `Assign to ${toAssignCount}`
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-[#faf9fd] px-4 py-10 text-center text-xs text-slate-500">
+              No interviewer accounts found.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 }
 
 const stageConfig = {
@@ -83,6 +325,9 @@ function buildApplicationsQuery(params) {
 }
 
 function getBulkActionLabel(action) {
+  if (action === 'assign' || action === 'assigned' || action?.includes('assign')) {
+    return 'assigned an interviewer';
+  }
   return action === 'advance' ? 'advanced' : 'rejected';
 }
 
@@ -91,7 +336,6 @@ function getDownloadFilename(contentDisposition) {
   return match?.[1] || 'hiring-pipeline.csv';
 }
 
-/* ── Filter label + select ── */
 function FilterField({ label, id, children }) {
   return (
     <div>
@@ -113,16 +357,167 @@ function CandidatesPage({ requestJson, token }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkResult, setBulkResult] = useState(null);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+  const [bulkAssignError, setBulkAssignError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const [error, setError] = useState('');
   const [jobsError, setJobsError] = useState('');
   const [exportError, setExportError] = useState('');
+  const [availableInterviewers, setAvailableInterviewers] = useState([]);
+  const [isLoadingInterviewers, setIsLoadingInterviewers] = useState(false);
+  const [assigningApplication, setAssigningApplication] = useState(null);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [pendingInterviewerId, setPendingInterviewerId] = useState('');
   const bulkRequestInFlightRef = useRef(false);
   const exportRequestInFlightRef = useRef(false);
 
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    async function loadInterviewers() {
+      setIsLoadingInterviewers(true);
+      try {
+        const data = await requestJson('/api/users?role=INTERVIEWER', { headers: authHeaders });
+        if (isCurrent) setAvailableInterviewers(data.users || []);
+      } catch {
+        // non-blocking
+      } finally {
+        if (isCurrent) setIsLoadingInterviewers(false);
+      }
+    }
+    loadInterviewers();
+    return () => { isCurrent = false; };
+  }, [authHeaders, requestJson]);
+
+  async function handleAssignInterviewer(interviewerId) {
+    if (!assigningApplication) return;
+    setAssignmentError('');
+    setPendingInterviewerId(interviewerId);
+    try {
+      const response = await requestJson(`/api/applications/${assigningApplication.id}/interviewers`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ interviewerId }),
+      });
+      const assignment = response.applicationInterviewer;
+      const matchedInterviewer = availableInterviewers.find((u) => u.id === interviewerId);
+      const fullAssignment = {
+        ...assignment,
+        interviewer: matchedInterviewer || { id: interviewerId, email: '' },
+      };
+
+      setApplications((prev) =>
+        prev.map((app) => {
+          if (app.id !== assigningApplication.id) return app;
+          return {
+            ...app,
+            interviewers: [...(app.interviewers || []), fullAssignment],
+          };
+        })
+      );
+      setAssigningApplication((prev) => ({
+        ...prev,
+        interviewers: [...(prev.interviewers || []), fullAssignment],
+      }));
+    } catch (err) {
+      setAssignmentError(err.message || 'Failed to assign interviewer.');
+    } finally {
+      setPendingInterviewerId('');
+    }
+  }
+
+  async function handleRemoveInterviewer(interviewerId) {
+    if (!assigningApplication) return;
+    setAssignmentError('');
+    setPendingInterviewerId(interviewerId);
+    try {
+      await requestJson(`/api/applications/${assigningApplication.id}/interviewers/${interviewerId}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      });
+
+      setApplications((prev) =>
+        prev.map((app) => {
+          if (app.id !== assigningApplication.id) return app;
+          return {
+            ...app,
+            interviewers: (app.interviewers || []).filter((ai) => ai.interviewerId !== interviewerId),
+          };
+        })
+      );
+      setAssigningApplication((prev) => ({
+        ...prev,
+        interviewers: (prev.interviewers || []).filter((ai) => ai.interviewerId !== interviewerId),
+      }));
+    } catch (err) {
+      setAssignmentError(err.message || 'Failed to remove interviewer.');
+    } finally {
+      setPendingInterviewerId('');
+    }
+  }
+
+  async function handleBulkAssignInterviewer(interviewer) {
+    setBulkAssignError('');
+    setPendingInterviewerId(interviewer.id);
+
+    const targetApplications = applications.filter((app) => selectedIds.has(app.id));
+    const unassignedTargets = targetApplications.filter(
+      (app) => !(app.interviewers || []).some((i) => i.interviewerId === interviewer.id)
+    );
+
+    if (unassignedTargets.length === 0) {
+      setBulkAssignError(`All selected candidates already have ${interviewer.email} assigned.`);
+      setPendingInterviewerId('');
+      return;
+    }
+
+    let successCount = 0;
+    const failures = [];
+
+    for (const app of unassignedTargets) {
+      try {
+        const res = await requestJson(`/api/applications/${app.id}/interviewers`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ interviewerId: interviewer.id }),
+        });
+        const assignment = res.applicationInterviewer;
+        const fullAssignment = {
+          ...assignment,
+          interviewer: { id: interviewer.id, email: interviewer.email },
+        };
+        setApplications((prev) =>
+          prev.map((item) => {
+            if (item.id !== app.id) return item;
+            return {
+              ...item,
+              interviewers: [...(item.interviewers || []), fullAssignment],
+            };
+          })
+        );
+        successCount += 1;
+      } catch (err) {
+        failures.push({
+          applicationId: app.id,
+          name: app.candidateName,
+          reason: err.message || 'Failed to assign',
+        });
+      }
+    }
+
+    setPendingInterviewerId('');
+    setIsBulkAssignOpen(false);
+    setSelectedIds(new Set());
+    setBulkResult({
+      action: 'assigned',
+      succeeded: successCount,
+      failed: failures.length,
+      failures,
+    });
+  }
 
   const queryState = useMemo(() => ({
     search: getSearchParam(searchParams, 'search'),
@@ -138,6 +533,7 @@ function CandidatesPage({ requestJson, token }) {
   const showingStart = pagination.total === 0 ? 0 : ((pagination.page - 1) * pagination.limit) + 1;
   const showingEnd = Math.min(pagination.page * pagination.limit, pagination.total);
   const selectedCount = selectedIds.size;
+  const bulkActionLabel = getBulkActionLabel(bulkResult?.action);
   const allCurrentPageSelected = applications.length > 0
     && applications.every((app) => selectedIds.has(app.id));
   const applicationNamesById = useMemo(() => {
@@ -491,6 +887,18 @@ function CandidatesPage({ requestJson, token }) {
                 Clear Selection
               </button>
               <button
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#6c5ce7] px-4 text-sm font-bold text-white shadow-sm shadow-[#6c5ce7]/20 transition hover:bg-[#5a49d6] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                disabled={isBulkSubmitting}
+                onClick={() => {
+                  setBulkAssignError('');
+                  setIsBulkAssignOpen(true);
+                }}
+                type="button"
+              >
+                <UsersIcon />
+                <span>Assign Panel ({selectedCount})</span>
+              </button>
+              <button
                 className="inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                 disabled={isBulkSubmitting}
                 onClick={() => runBulkAction('advance')}
@@ -610,14 +1018,38 @@ function CandidatesPage({ requestJson, token }) {
                         <span className="text-slate-400">Not set</span>
                       )}
                     </td>
-                    <td className="px-4 py-4">
-                      {application.source
-                        ? <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{application.source}</span>
-                        : <span className="text-sm text-slate-400">—</span>}
-                    </td>
                     <td className="px-4 py-4"><StageBadge stage={application.stage} /></td>
+                    <td className="px-4 py-4">
+                      {application.interviewers?.length ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          {application.interviewers.map((item) => (
+                            <span
+                              className="inline-flex items-center rounded-md bg-[#f0edff] px-2 py-0.5 text-[10px] font-bold text-[#5a49d6]"
+                              key={item.interviewerId}
+                              title={item.interviewer?.email}
+                            >
+                              {item.interviewer?.email?.split('@')[0]}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Unassigned</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-500">{formatDate(application.appliedAt)}</td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-500">{formatDate(application.updatedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-4 text-right text-xs">
+                      <button
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-bold text-slate-700 shadow-xs transition hover:border-[#6c5ce7] hover:bg-[#f8f7fc] hover:text-[#6c5ce7]"
+                        onClick={() => {
+                          setAssignmentError('');
+                          setAssigningApplication(application);
+                        }}
+                        type="button"
+                      >
+                        <UsersIcon />
+                        <span>Assign Panel</span>
+                      </button>
+                    </td>
                   </tr>
                 )) : (
                   <tr>
@@ -667,6 +1099,31 @@ function CandidatesPage({ requestJson, token }) {
           </div>
         </div>
       </div>
+
+      {assigningApplication ? (
+        <AssignmentModal
+          application={assigningApplication}
+          error={assignmentError}
+          interviewers={availableInterviewers}
+          isLoading={isLoadingInterviewers}
+          onAssign={handleAssignInterviewer}
+          onClose={() => setAssigningApplication(null)}
+          onRemove={handleRemoveInterviewer}
+          pendingInterviewerId={pendingInterviewerId}
+        />
+      ) : null}
+
+      {isBulkAssignOpen ? (
+        <BulkAssignmentModal
+          error={bulkAssignError}
+          interviewers={availableInterviewers}
+          isLoading={isLoadingInterviewers}
+          onAssign={handleBulkAssignInterviewer}
+          onClose={() => setIsBulkAssignOpen(false)}
+          pendingInterviewerId={pendingInterviewerId}
+          selectedApplications={applications.filter((app) => selectedIds.has(app.id))}
+        />
+      ) : null}
     </div>
   );
 }
