@@ -1,16 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #020617;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
   background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Design tokens */
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --primary-light: #818cf8;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: rgba(255,255,255,0.06);
+  --card-shadow: 0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.07);
+  --card-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.08);
 }
 
 * {
@@ -24,6 +34,139 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Selection */
+::selection {
+  background: #c7d2fe;
+  color: #3730a3;
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Utility classes */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(.16,1,.3,1) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(.16,1,.3,1) both;
+}
+
+.animate-spin-smooth {
+  animation: spin 0.9s linear infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Input focus ring */
+.input-base {
+  @apply h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400;
+}
+.input-base:focus {
+  @apply border-indigo-400 ring-4 ring-indigo-500/10;
+}
+
+/* Premium button */
+.btn-primary {
+  @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition-all duration-200;
+}
+.btn-primary:hover {
+  @apply bg-indigo-700 shadow-md -translate-y-px;
+}
+.btn-primary:disabled {
+  @apply cursor-not-allowed bg-slate-300 text-slate-500 translate-y-0 shadow-none;
+}
+
+.btn-secondary {
+  @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200;
+}
+.btn-secondary:hover {
+  @apply border-slate-300 bg-slate-50 text-slate-900 -translate-y-px shadow-md;
+}
+.btn-secondary:disabled {
+  @apply cursor-not-allowed opacity-50 translate-y-0 shadow-none;
+}
+
+/* Card */
+.card {
+  @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+}
+
+/* Stage badge colors */
+.stage-applied   { @apply bg-blue-50   border-blue-200   text-blue-700; }
+.stage-screening { @apply bg-violet-50 border-violet-200 text-violet-700; }
+.stage-interview { @apply bg-amber-50  border-amber-200  text-amber-700; }
+.stage-offer     { @apply bg-indigo-50 border-indigo-200 text-indigo-700; }
+.stage-hired     { @apply bg-emerald-50 border-emerald-200 text-emerald-700; }
+.stage-rejected  { @apply bg-red-50    border-red-200    text-red-600; }
