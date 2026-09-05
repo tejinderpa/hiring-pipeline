@@ -73,6 +73,26 @@ function parseOptionalDateTime(value, fieldName) {
   return { value: date };
 }
 
+function getStartOfCurrentMinute() {
+  const currentMinute = new Date();
+  currentMinute.setSeconds(0, 0);
+  return currentMinute;
+}
+
+function parseOptionalFutureDateTime(value, fieldName) {
+  const result = parseOptionalDateTime(value, fieldName);
+
+  if (result.error || result.value === null) {
+    return result;
+  }
+
+  if (result.value < getStartOfCurrentMinute()) {
+    return { error: `${fieldName} cannot be in the past` };
+  }
+
+  return result;
+}
+
 function buildApplicationResponse(application) {
   return { application };
 }
@@ -167,7 +187,7 @@ function buildApplicationPatchData(body) {
   }
 
   if (Object.hasOwn(body, 'interviewScheduledAt')) {
-    const interviewScheduledAtResult = parseOptionalDateTime(
+    const interviewScheduledAtResult = parseOptionalFutureDateTime(
       body.interviewScheduledAt,
       'interviewScheduledAt',
     );

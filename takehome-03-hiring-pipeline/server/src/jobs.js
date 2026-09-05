@@ -13,6 +13,7 @@ const applicationCreateFields = new Set([
   'candidateEmail',
   'source',
   'notes',
+  'appliedAt',
   'interviewScheduledAt',
 ]);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +53,53 @@ function parseOptionalDateTime(value, fieldName) {
 
   if (Number.isNaN(date.getTime())) {
     return { error: `${fieldName} must be a valid date` };
+  }
+
+  return { value: date };
+}
+
+function getStartOfCurrentMinute() {
+  const currentMinute = new Date();
+  currentMinute.setSeconds(0, 0);
+  return currentMinute;
+}
+
+function parseOptionalFutureDateTime(value, fieldName) {
+  const result = parseOptionalDateTime(value, fieldName);
+
+  if (result.error || result.value === null) {
+    return result;
+  }
+
+  if (result.value < getStartOfCurrentMinute()) {
+    return { error: `${fieldName} cannot be in the past` };
+  }
+
+  return result;
+}
+
+function getStartOfTomorrow() {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
+}
+
+function parseAppliedAt(value) {
+  const rawValue = value || new Date().toISOString().slice(0, 10);
+
+  if (typeof rawValue !== 'string') {
+    return { error: 'appliedAt must be a date string' };
+  }
+
+  const date = new Date(`${rawValue}T00:00:00.000`);
+
+  if (Number.isNaN(date.getTime())) {
+    return { error: 'appliedAt must be a valid date' };
+  }
+
+  if (date >= getStartOfTomorrow()) {
+    return { error: 'Applied date cannot be in the future' };
   }
 
   return { value: date };
@@ -162,6 +210,7 @@ function buildApplicationCreateData(body, jobOpeningId) {
   const candidateEmail = trimString(body.candidateEmail).toLowerCase();
   const source = trimString(body.source);
   const notes = Object.hasOwn(body, 'notes') ? body.notes : null;
+  const appliedAt = Object.hasOwn(body, 'appliedAt') ? body.appliedAt : null;
   const interviewScheduledAt = Object.hasOwn(body, 'interviewScheduledAt')
     ? body.interviewScheduledAt
     : null;
@@ -186,10 +235,15 @@ function buildApplicationCreateData(body, jobOpeningId) {
     return { error: 'Notes must be a string' };
   }
 
-  const interviewScheduledAtResult = parseOptionalDateTime(
+  const interviewScheduledAtResult = parseOptionalFutureDateTime(
     interviewScheduledAt,
     'interviewScheduledAt',
   );
+  const appliedAtResult = parseAppliedAt(appliedAt);
+
+  if (appliedAtResult.error) {
+    return { error: appliedAtResult.error };
+  }
 
   if (interviewScheduledAtResult.error) {
     return { error: interviewScheduledAtResult.error };
@@ -202,6 +256,8 @@ function buildApplicationCreateData(body, jobOpeningId) {
       candidateEmail,
       source,
       notes: trimString(notes) || null,
+      appliedAt: appliedAtResult.value,
+      stageEnteredAt: appliedAtResult.value,
       interviewScheduledAt: interviewScheduledAtResult.value,
     },
   };
@@ -299,7 +355,7 @@ router.post('/:jobId/applications', async (req, res, next) => {
     }
 
     if (hasUnknownFields(body, applicationCreateFields)) {
-      return res.status(400).json({ error: 'Only candidateName, candidateEmail, source, notes, and interviewScheduledAt are allowed' });
+      return res.status(400).json({ error: 'Only candidateName, candidateEmail, source, notes, appliedAt, and interviewScheduledAt are allowed' });
     }
 
     const existingJob = await findJob(req.params.jobId);
