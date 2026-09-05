@@ -730,8 +730,6 @@ function CandidatesPage({ requestJson, token }) {
     }
   }
 
-  const bulkActionLabel = bulkResult ? getBulkActionLabel(bulkResult.action) : '';
-
   return (
     <div className="flex flex-1 flex-col animate-fade-in">
       <PageHeader
